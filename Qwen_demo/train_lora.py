@@ -136,6 +136,7 @@ Dataset({
 # 原文设置device_map="auto"，就是默认值，省略掉
 model = AutoModelForCausalLM.from_pretrained(CKPT_PATH, trust_remote_code=True, load_in_8bit=True,
                                              torch_dtype=torch.bfloat16)
+assert model.dtype == torch.bfloat16
 """
 1.8B模型有24层、隐维度2048; 7B模型有32层、隐维度4096
 
@@ -318,7 +319,7 @@ model.eval().chat(tokenizer, "帕金森叠加综合征的辅助治疗有些什�
 # 正式训练
 # 用什么loss是定义在QWenLMHeadModel里面的，通用做法
 # 用CrossEntropyLoss实现的LM任务，同时该loss会忽略-100的label
-trainer.train()
+trainer.train()  # 会自动调用model.train()
 """
 TrainOutput(global_step=744, training_loss=1.3516380351076844, metrics={'train_runtime': 1978.4477, 'train_samples_per_second': 6.065, 'train_steps_per_second': 0.376, 'total_flos': 3.0783890072223744e+16, 'train_loss': 1.3516380351076844, 'epoch': 11.9})
 """
