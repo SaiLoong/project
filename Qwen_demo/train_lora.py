@@ -4,9 +4,15 @@
 # @date 2024/6/15
 
 import json
+import os
+
+import torch
+
+# 保存模型时peft会访问huggingface，对比线上词汇表和本地的是否一致（如果不一致则也保存embedding参数）。但是DSW连接不上，因此换成国内镜像站
+# 必须放在任何huggingface系列库的前面
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 import datasets
-import torch
 from peft import get_peft_model
 from peft import LoraConfig
 from transformers import AutoModelForCausalLM
