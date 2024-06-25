@@ -117,14 +117,3 @@ if __name__ == "__main__":
     print(f"{label_text_list=}\n")
     for input_text, label_text in zip(input_prompt_list, label_text_list):
         print(f"{repr(input_text)}\t\t{repr(label_text)}")
-
-    # old ==========================
-    for k, v in ret.items():
-        v = v[0].tolist()
-        print(f'{k}={v} len={len(v)}\n')
-    print(repr(tokenizer.decode(ret["input_ids"][0].tolist())))
-
-    for input_id, mask, label in zip(ret["input_ids"][0].tolist(), ret["attention_mask"][0].tolist(),
-                                     ret["labels"][0].tolist()):
-        print(f"{repr(input_id)}\t{repr(mask)}\t{repr(label)}\t{repr(tokenizer.decode(input_id))}\t"
-              f"{repr(label if label == IGNORE_TOKEN_ID else tokenizer.decode(label))}")
