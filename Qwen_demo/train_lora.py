@@ -60,6 +60,7 @@ QWenTokenizer(name_or_path='Qwen-1_8B-Chat', vocab_size=151851, model_max_length
 """
 
 
+# TODO 根据官方repo finetune.py的preprocess函数，labels的屏蔽逻辑有一点不同
 def process_func(example):
     # Qwen 1.8B/7B的词元输入上限是8k/32k，原文说限制为512，考虑到汉字（生僻字）可能会切分成多个词元，因此进一步缩短为384（75%）
     # 但是MAX_LENGTH后面是用来处理词元而不是汉字的！简单看成进一步限制长度吧
