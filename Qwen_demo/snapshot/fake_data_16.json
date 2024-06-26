@@ -1,0 +1,82 @@
+[
+    {
+        "instruction": "1+1=?",
+        "input": "",
+        "output": "2"
+    },
+    {
+        "instruction": "1+2=?",
+        "input": "",
+        "output": "3"
+    },
+    {
+        "instruction": "3-1=?",
+        "input": "",
+        "output": "2"
+    },
+    {
+        "instruction": "1+6=?",
+        "input": "",
+        "output": "7"
+    },
+    {
+        "instruction": "6-2=?",
+        "input": "",
+        "output": "4"
+    },
+    {
+        "instruction": "9-5=?",
+        "input": "",
+        "output": "4"
+    },
+    {
+        "instruction": "2*3=?",
+        "input": "",
+        "output": "6"
+    },
+    {
+        "instruction": "2*3=?",
+        "input": "",
+        "output": "6"
+    },
+    {
+        "instruction": "1+1=?",
+        "input": "",
+        "output": "2"
+    },
+    {
+        "instruction": "1+2=?",
+        "input": "",
+        "output": "3"
+    },
+    {
+        "instruction": "3-1=?",
+        "input": "",
+        "output": "2"
+    },
+    {
+        "instruction": "1+6=?",
+        "input": "",
+        "output": "7"
+    },
+    {
+        "instruction": "6-2=?",
+        "input": "",
+        "output": "4"
+    },
+    {
+        "instruction": "9-5=?",
+        "input": "",
+        "output": "4"
+    },
+    {
+        "instruction": "2*3=?",
+        "input": "",
+        "output": "6"
+    },
+    {
+        "instruction": "2*3=?",
+        "input": "",
+        "output": "6"
+    }
+]

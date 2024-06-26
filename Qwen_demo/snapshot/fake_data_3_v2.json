@@ -1,0 +1,17 @@
+[
+    {
+        "instruction": "0+1=?",
+        "input": "",
+        "output": "1"
+    },
+    {
+        "instruction": "1+10=?",
+        "input": "",
+        "output": "11"
+    },
+    {
+        "instruction": "2+100=?",
+        "input": "",
+        "output": "102"
+    }
+]
