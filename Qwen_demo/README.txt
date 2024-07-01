@@ -13,3 +13,4 @@ snapshot: 存放实际运行时的文件和关键输出
     quick_test.ipynb: 用于快速跑通训练流程、研究代码原理
     fake_data_xxx.json: 用于快速实验的数据
     without_flash_attn.ipynb、with_flash_attn.ipynb: 对比测试flash attention带来的提升
+    rag_test.ipynb: 跟着跑原始rag.ipynb，做了一些修改和笔记
