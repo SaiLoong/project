@@ -1,7 +1,13 @@
+# -*- coding: utf-8 -*-
+# @file A00_question_to_csv.py
+# @author zhangshilong
+# @date 2024/7/4
+
 import csv
 
 import jsonlines
 
+QUESTION_NUM = 1000
 WORKSPACE_DIR = "/mnt/workspace"
 DATASET_DIR = f"{WORKSPACE_DIR}/bs_challenge_financial_14b_dataset"
 INTERMEDIATE_DIR = f"{WORKSPACE_DIR}/intermediate"
@@ -18,10 +24,12 @@ def write_jsonl(path, data):
 
 
 data = read_jsonl(f"{DATASET_DIR}/question.json")
+assert len(data) == QUESTION_NUM
+
 # TODO 原本用'utf-8-sig'
 with open(f"{INTERMEDIATE_DIR}/question_csv.csv", "w", newline="", encoding="utf-8") as f:
-    csvwriter = csv.writer(f)
-    csvwriter.writerow(["问题id", "问题"])
+    writer = csv.writer(f)
+    writer.writerow(["问题id", "问题"])
     for item in data:
         # TODO 原版废代码：temp_question = temp_question.replace(' ', '')
-        csvwriter.writerow([item["id"], item["question"]])
+        writer.writerow([item["id"], item["question"]])
