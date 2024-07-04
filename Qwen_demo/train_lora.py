@@ -144,6 +144,7 @@ Dataset({
 model = AutoModelForCausalLM.from_pretrained(CKPT_PATH, trust_remote_code=True, load_in_8bit=True,
                                              torch_dtype=torch.bfloat16)
 assert model.dtype == torch.bfloat16
+assert model.device.type == "cuda"
 """
 1.8B模型有24层、隐维度2048; 7B模型有32层、隐维度4096
 

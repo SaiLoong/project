@@ -26,10 +26,8 @@ def write_jsonl(path, data):
 data = read_jsonl(f"{DATASET_DIR}/question.json")
 assert len(data) == QUESTION_NUM
 
-# TODO 原本用'utf-8-sig'
 with open(f"{INTERMEDIATE_DIR}/question_csv.csv", "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
     writer.writerow(["问题id", "问题"])
     for item in data:
-        # TODO 原版废代码：temp_question = temp_question.replace(' ', '')
         writer.writerow([item["id"], item["question"]])
