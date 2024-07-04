@@ -26,16 +26,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True)
 question_df = pd.read_csv(f"{INTERMEDIATE_DIR}/question_csv.csv")
 assert len(question_df) == QUESTION_NUM
 
-# TODO 晚点检查公司名是否提取正确
-"""
-readme解释：
-使用正则表达式抽取公司名称。将举办方提供的每个text格式招股书文件分为1000字每段，
-相邻两段具有200字重叠的片段，使用Qwen大模型的tokenizer进行词频统计备用
-
-应该和Qwen Demo的做法差不多，80间公司不算多，人工检验+校准bad case不难
-最后的词频应该放在AD_normalized_ot.csv，后面会用到
-14B-Chat和14B-Chat-Int4的词汇表是一致的，可放心使用
-"""
+# TODO 有三个公司名不正确，但应该不影响回答，晚点处理
 company_df = pd.read_csv(f"{FILES_DIR}/AF0_pdf_to_company.csv")
 assert len(company_df) == COMPANY_NUM
 
@@ -54,7 +45,6 @@ model.generation_config = GenerationConfig.from_pretrained(model_dir, trust_remo
 # TODO prompt进一步优化方向
 """
 "你是一个问题分类器"放到system prompt
-引号是否必要
 XX的长度
 22个shot会不会太多
 """
@@ -161,3 +151,11 @@ with open(f"{INTERMEDIATE_DIR}/A01_question_classify.csv", "w", newline="", enco
             temp_calss = "Text"
 
         writer.writerow([row["问题id"], question, response, temp_class])
+
+# TODO
+"""
+prompt模板是不是从question提取的？
+选100条question人工标注，检查答案正确率
+为了确定答案，需要提前了解一下数据库的字段，尤其是公司名会不会重叠
+
+"""
