@@ -41,7 +41,6 @@ assert model.device.type == "cuda"
 # 原本默认do_sample=True、top_p=0.8、没有设temperature。没有seed参数
 model.generation_config = GenerationConfig.from_pretrained(model_dir, trust_remote_code=True, do_sample=False)
 
-# TODO prompt问题挺多：模板行首有空格、尾行换行，后面拼接问题时格式没对齐、没有后引号
 # TODO prompt进一步优化方向
 """
 "你是一个问题分类器"放到system prompt
@@ -146,16 +145,12 @@ with open(f"{INTERMEDIATE_DIR}/A01_question_classify.csv", "w", newline="", enco
                 if company_name in question:
                     temp_class = "Text"
 
-        # TODO 这应该是复赛的数据。但写错了变量名temp_calss，没发挥作用？？？？
-        if index in [166, 174]:
-            temp_calss = "Text"
-
         writer.writerow([row["问题id"], question, response, temp_class])
 
 # TODO
 """
 prompt模板是不是从question提取的？
 选100条question人工标注，检查答案正确率
-为了确定答案，需要提前了解一下数据库的字段，尤其是公司名会不会重叠
 
+id 879   生态环境建设行业的上游是什么行业？     貌似找不到答案，但看着像SQL分类
 """
