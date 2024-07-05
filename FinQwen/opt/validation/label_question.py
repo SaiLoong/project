@@ -21,7 +21,7 @@ assert len(question_df) == QUESTION_NUM
 sample_df = question_df.sample(SAMPLE_NUM, random_state=SEED)
 sample_df.sort_index(inplace=True)
 sample_df.rename(columns={"id": "问题id", "question": "问题"}, inplace=True)
-sample_df["分类"] = ""
+sample_df["标签"] = ""
 
 # 导出后，人工填上标签保存为question_test.json
 sample_df.to_json(f"{VALIDATION_DIR}/raw_question_test.json", orient="records", force_ascii=False, indent=4)
@@ -29,14 +29,15 @@ sample_df.to_json(f"{VALIDATION_DIR}/raw_question_test.json", orient="records", 
 # 载入标好的数据
 label_df = pd.read_json(f"{VALIDATION_DIR}/question_test.json")
 assert len(label_df) == SAMPLE_NUM
-label_counts = label_df["分类"].label_counts()
-print(f"{label_counts=}")
+
+label_counts = label_df["标签"].value_counts()
+print(f"{label_counts=}")  # 57个SQL, 43个Text
 assert set(label_counts.index.tolist()) == set(LABELS)
 
 # 分类打印出来，复验是否标错
 for label in LABELS:
     print(f"{label=}")
-    for q in label_df.query(f"分类=='{label}'")["问题"]:
+    for q in label_df.query(f"标签=='{label}'")["问题"]:
         print(f"\t{q}\n")
     print()
 # 经复验，标签全部正确

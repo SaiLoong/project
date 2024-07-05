@@ -20,9 +20,9 @@ label_df = pd.read_json(f"{VALIDATION_DIR}/question_test.json")
 assert len(label_df) == SAMPLE_NUM
 
 ref_df2 = ref_df[["问题id", "分类"]]
-merge_df = pd.merge(label_df, ref_df2, how="left", on="问题id", suffixes=("_label", "_ref"))
+merge_df = pd.merge(label_df, ref_df2, how="left", on="问题id")
 
-merge_df["correct"] = merge_df["分类_label"] == merge_df["分类_ref"]
+merge_df["correct"] = merge_df["标签"] == merge_df["分类"]
 merge_df["correct"].sum()
 merge_df.query("correct == False")
 """
