@@ -150,7 +150,4 @@ with open(f"{INTERMEDIATE_DIR}/A01_question_classify.csv", "w", newline="", enco
 # TODO
 """
 prompt模板是不是从question提取的？
-选100条question人工标注，检查答案正确率
-
-id 879   生态环境建设行业的上游是什么行业？     貌似找不到答案，但看着像SQL分类
 """

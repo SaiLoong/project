@@ -6,7 +6,7 @@
 import pandas as pd
 
 QUESTION_NUM = 1000
-CATEGORIES = ["Text", "SQL"]
+LABELS = ["Text", "SQL"]
 WORKSPACE_DIR = "/mnt/workspace"
 DATASET_DIR = f"{WORKSPACE_DIR}/bs_challenge_financial_14b_dataset"
 VALIDATION_DIR = f"{WORKSPACE_DIR}/validation"
@@ -29,14 +29,14 @@ sample_df.to_json(f"{VALIDATION_DIR}/raw_question_test.json", orient="records", 
 # 载入标好的数据
 label_df = pd.read_json(f"{VALIDATION_DIR}/question_test.json")
 assert len(label_df) == SAMPLE_NUM
-value_counts = label_df["分类"].value_counts()
-print(f"{value_counts=}")
-assert set(value_counts.index.tolist()) == set(CATEGORIES)
+label_counts = label_df["分类"].label_counts()
+print(f"{label_counts=}")
+assert set(label_counts.index.tolist()) == set(LABELS)
 
 # 分类打印出来，复验是否标错
-for category in CATEGORIES:
-    print(f"{category=}")
-    for q in label_df.query(f"分类=='{category}'")["问题"]:
+for label in LABELS:
+    print(f"{label=}")
+    for q in label_df.query(f"分类=='{label}'")["问题"]:
         print(f"\t{q}\n")
     print()
 # 经复验，标签全部正确
