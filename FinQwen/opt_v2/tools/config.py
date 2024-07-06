@@ -21,12 +21,15 @@ class ConfigMeta(type):
         pd.set_option("display.max_columns", None)
         pd.set_option("display.max_colwidth", 500)  # 显示完整的文本
 
+        cls.set_seed()
         if platform.system() == "Linux":
             [File.makedirs(v) for k, v in vars(cls).items() if k.endswith("_DIR")]
 
 
 class Config(metaclass=ConfigMeta):
+    SEED = 1024
     QUESTION_NUM = 1000
+    TEST_QUESTION_NUM = 100
     COMPANY_NUM = 80
 
     WORKSPACE_DIR = "/mnt/workspace"
@@ -46,6 +49,7 @@ class Config(metaclass=ConfigMeta):
     COMPANY_PATH = File.join(INTERMEDIATE_DIR, "A1_cid_to_company.csv")
     COMPANY_PDF_DIR = File.join(INTERMEDIATE_DIR, "pdf")
     COMPANY_TXT_DIR = File.join(INTERMEDIATE_DIR, "txt")
+    TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "test_question.csv")
 
     @classmethod
     def company_pdf_path(cls, cid: Optional[str] = None, company: Optional[str] = None):
@@ -76,7 +80,14 @@ class Config(metaclass=ConfigMeta):
         return ref_company_df
 
     @classmethod
-    def set_seed(cls, seed: int = 1024) -> None:
+    def get_test_question_df(cls):
+        test_question_df = pd.read_csv(cls.TEST_QUESTION_PATH)
+        assert len(test_question_df) == cls.TEST_QUESTION_NUM
+        return test_question_df
+
+    @classmethod
+    def set_seed(cls, seed: Optional[int] = None) -> None:
+        seed = seed or cls.SEED
         set_seed(seed)
 
     @classmethod

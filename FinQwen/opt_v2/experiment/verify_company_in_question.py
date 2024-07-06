@@ -7,8 +7,6 @@ import re
 
 from ..tools.config import Config
 
-Config.set_seed()
-
 # 获取问题
 question_df = Config.get_question_df()
 questions = question_df["question"].tolist()

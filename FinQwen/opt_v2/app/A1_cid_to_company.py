@@ -10,8 +10,6 @@ import pandas as pd
 from ..tools.config import Config
 from ..tools.utils import File
 
-Config.set_seed()
-
 # 加载原映射表
 ref_company_df = Config.get_ref_company_df()
 
