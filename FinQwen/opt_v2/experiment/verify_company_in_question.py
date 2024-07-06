@@ -9,7 +9,7 @@ from ..tools.config import Config
 
 # 获取问题
 question_df = Config.get_question_df()
-questions = question_df["question"].tolist()
+questions = question_df["问题"].tolist()
 
 # 获取公司名
 ref_company_df = Config.get_ref_company_df()

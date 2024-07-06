@@ -13,7 +13,6 @@ question_df = Config.get_question_df()
 # 虽然Config.set_seed()已经保证了第一次运行这句必然有相同的结果，但考虑到在notebook可能会多次运行，因此还是加上seed
 sample_df = question_df.sample(Config.TEST_QUESTION_NUM, random_state=Config.SEED)
 sample_df.sort_index(inplace=True)
-sample_df.rename(columns={"id": "问题id", "question": "问题"}, inplace=True)
 sample_df["标签"] = ""
 
 # 导出成json格式，方便填上标签

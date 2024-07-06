@@ -50,6 +50,7 @@ class Config(metaclass=ConfigMeta):
     COMPANY_PDF_DIR = File.join(INTERMEDIATE_DIR, "pdf")
     COMPANY_TXT_DIR = File.join(INTERMEDIATE_DIR, "txt")
     TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "test_question.csv")
+    QUESTION_CATEGORY_PATH = File.join(INTERMEDIATE_DIR, "A2_question_category.csv")
 
     @classmethod
     def company_pdf_path(cls, cid: Optional[str] = None, company: Optional[str] = None):
@@ -71,6 +72,7 @@ class Config(metaclass=ConfigMeta):
     def get_question_df(cls):
         question_df = pd.read_json(cls.QUESTION_PATH, lines=True)
         assert len(question_df) == cls.QUESTION_NUM
+        question_df.rename(columns={"id": "问题id", "question": "问题"}, inplace=True)
         return question_df
 
     @classmethod
@@ -80,10 +82,25 @@ class Config(metaclass=ConfigMeta):
         return ref_company_df
 
     @classmethod
+    def get_company_df(cls, return_companies: bool = False):
+        company_df = pd.read_csv(cls.COMPANY_PATH)
+        assert len(company_df) == cls.COMPANY_NUM
+        if return_companies:
+            return company_df, company_df["公司名称"].tolist()
+        else:
+            return company_df
+
+    @classmethod
     def get_test_question_df(cls):
         test_question_df = pd.read_csv(cls.TEST_QUESTION_PATH)
         assert len(test_question_df) == cls.TEST_QUESTION_NUM
         return test_question_df
+
+    @classmethod
+    def get_question_category_df(cls):
+        question_category_df = pd.read_csv(cls.QUESTION_CATEGORY_PATH)
+        assert len(question_category_df) == cls.QUESTION_NUM
+        return question_category_df
 
     @classmethod
     def set_seed(cls, seed: Optional[int] = None) -> None:
