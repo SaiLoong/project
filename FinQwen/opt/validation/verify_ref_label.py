@@ -16,11 +16,11 @@ ref_df = pd.read_csv(f"{VALIDATION_DIR}/ref_A01_question_classify.csv")
 assert len(ref_df) == QUESTION_NUM
 
 # 加载人工标注数据
-label_df = pd.read_json(f"{VALIDATION_DIR}/question_test.json")
-assert len(label_df) == SAMPLE_NUM
+test_df = pd.read_json(f"{VALIDATION_DIR}/question_test.json")
+assert len(test_df) == SAMPLE_NUM
 
 ref_df2 = ref_df[["问题id", "分类"]]
-merge_df = pd.merge(label_df, ref_df2, how="left", on="问题id")
+merge_df = pd.merge(test_df, ref_df2, how="left", on="问题id")
 
 merge_df["correct"] = merge_df["标签"] == merge_df["分类"]
 merge_df["correct"].sum()
