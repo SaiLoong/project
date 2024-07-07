@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file classification_prompt_storage.py
+# @file classification_prompt.py
 # @author zhangshilong
 # @date 2024/7/7
 

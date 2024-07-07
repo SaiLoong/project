@@ -13,7 +13,7 @@ model = Config.get_model()
 
 test_question_df = Config.get_test_question_df()
 
-# 从原作者的prompt_template逐渐修改，优化到可读性、效果最优，迭代过程和batch代码记录在classification_prompt_storage.py
+# 从原作者的prompt_template逐渐修改，优化到可读性、效果最优，迭代过程和batch代码记录在storage.classification_prompt.py
 prompt_template_v5 = """对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
 
 问题：在2019年的中期报告里，XX基金管理有限公司管理的基金中，有多少比例的基金是个人投资者持有的份额超过机构投资者？希望得到一个精确到两位小数的百分比。

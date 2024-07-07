@@ -4,6 +4,7 @@ opt: 自己的改进方案
     tools: 公共类集合
     intermediate: app代码跑出来的中间文件
     experiment: 实验代码，包括分析数据、想法实践等
+        storage: 存放杂七杂八的代码片段
 
 ref: 存放原作者的原始文件
     app: 存放原始代码，包括原始的py，和最小限度修改至能跑通的ipynb
