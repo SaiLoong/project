@@ -37,5 +37,9 @@ def func(row):
 
 category_df = pd.concat([question_df, question_df.progress_apply(func, axis=1)], axis=1)
 
+# 查看分类比例
+category_counts = category_df["分类"].value_counts()
+print(f"{category_counts=}")  # 611个SQL, 389个Text
+
 # 保存
 category_df.to_csv(Config.QUESTION_CATEGORY_PATH, index=False)

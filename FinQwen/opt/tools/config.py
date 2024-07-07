@@ -85,10 +85,11 @@ class Config(metaclass=ConfigMeta):
         return File.join(cls.WORKSPACE_DIR, model_name)
 
     @classmethod
-    def get_question_df(cls):
+    def get_question_df(cls, rename: bool = True):
         question_df = pd.read_json(cls.QUESTION_PATH, lines=True)
         assert len(question_df) == cls.QUESTION_NUM
-        question_df.rename(columns={"id": "问题id", "question": "问题"}, inplace=True)
+        if rename:
+            question_df.rename(columns={"id": "问题id", "question": "问题"}, inplace=True)
         return question_df
 
     @classmethod
