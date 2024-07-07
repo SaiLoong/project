@@ -18,7 +18,11 @@ from transformers import GenerationConfig
 from transformers import set_seed
 
 from constant import ModelMode
-from qwen_generation_utils import batch
+from constant import ModelName
+from qwen_utils import batch
+from qwen_utils import batch_decode_each
+from qwen_utils import cut
+from qwen_utils import decode_each
 from utils import File
 
 
@@ -61,7 +65,7 @@ class Config(metaclass=ConfigMeta):
     TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "test_question.csv")
     QUESTION_CATEGORY_PATH = File.join(INTERMEDIATE_DIR, "A2_question_category.csv")
 
-    MODEL_NAME = "Tongyi-Finance-14B-Chat-Int4"
+    MODEL_NAME = ModelName.TONGYI_FINANCE_14B_CHAT_INT4
 
     @classmethod
     def company_pdf_path(cls, cid: Optional[str] = None, company: Optional[str] = None):
@@ -82,6 +86,7 @@ class Config(metaclass=ConfigMeta):
     @classmethod
     def model_dir(cls, model_name: Optional[str] = None):
         model_name = model_name or cls.MODEL_NAME
+        assert model_name in ModelName.values()
         return File.join(cls.WORKSPACE_DIR, model_name)
 
     @classmethod
@@ -129,6 +134,12 @@ class Config(metaclass=ConfigMeta):
         tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True, padding_side=padding_side,
                                                   **kwargs)
         tokenizer.pad_token_id = tokenizer.eod_id
+
+        # 添加decode_each、batch_decode_each、cut方法
+        tokenizer.decode_each = MethodType(decode_each, tokenizer)
+        tokenizer.batch_decode_each = MethodType(batch_decode_each, tokenizer)
+        tokenizer.cut = MethodType(cut, tokenizer)
+
         return tokenizer
 
     @classmethod

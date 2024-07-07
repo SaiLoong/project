@@ -10,7 +10,7 @@ import pandas as pd
 
 from ..tools.config import Config
 from ..tools.constant import Category
-from ..tools.constant import N_A
+from ..tools.constant import NA
 
 question_df = Config.get_question_df()
 company_df, companies = Config.get_company_df(return_companies=True)
@@ -29,8 +29,8 @@ def func(row):
         cid = company_to_cid_mapping[company]
     else:
         category = Category.SQL
-        company = N_A
-        cid = N_A
+        company = NA
+        cid = NA
 
     return pd.Series({"分类": category, "公司名称": company, "公司id": cid})
 

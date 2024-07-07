@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file qwen_generation_utils.py
+# @file qwen_utils.py
 # @author zhangshilong
 # @date 2024/7/7
 
@@ -14,6 +14,7 @@ from typing import Tuple
 from typing import Union
 
 import torch
+from transformers import PreTrainedModel
 from transformers import PreTrainedTokenizer
 
 # Types.
@@ -212,8 +213,9 @@ def decode_tokens(
         raise NotImplementedError(f"Unknown chat format {chat_format!r}")
 
 
+# 批量推理接口
 def batch(
-        model,
+        model: PreTrainedModel,
         tokenizer: PreTrainedTokenizer,
         queries: List[str],
         system: str = "You are a helpful assistant."
@@ -256,3 +258,41 @@ def batch(
     ]
 
     return batch_response
+
+
+# 解码词元列表时，并不合并成一个长字符串
+# 对应decode接口
+def decode_each(
+        tokenizer: PreTrainedTokenizer,
+        token_ids: List[int],
+        skip_special_tokens: bool = False,
+        clean_up_tokenization_spaces: bool = None,
+        **kwargs
+) -> List[str]:
+    return [tokenizer.decode(token_id, skip_special_tokens, clean_up_tokenization_spaces, **kwargs)
+            for token_id in token_ids]
+
+
+# 对应batch_decode接口
+def batch_decode_each(
+        tokenizer: PreTrainedTokenizer,
+        batch_token_ids: List[List[int]],
+        skip_special_tokens: bool = False,
+        clean_up_tokenization_spaces: bool = None,
+        **kwargs
+) -> List[List[str]]:
+    return [decode_each(tokenizer, token_ids, skip_special_tokens, clean_up_tokenization_spaces, **kwargs)
+            for token_ids in batch_token_ids]
+
+
+# 分词接口，与tokenizer.__call__一样能处理文本和文本列表两种情况
+def cut(
+        tokenizer: PreTrainedTokenizer,
+        text: Union[str, List[str]],
+        skip_special_tokens: bool = False,
+        clean_up_tokenization_spaces: bool = None,
+        **kwargs
+) -> Union[List[str], List[List[str]]]:
+    token_ids = tokenizer(text)["input_ids"]
+    decode_func = decode_each if isinstance(text, str) else batch_decode_each
+    return decode_func(tokenizer, token_ids, skip_special_tokens, clean_up_tokenization_spaces, **kwargs)
