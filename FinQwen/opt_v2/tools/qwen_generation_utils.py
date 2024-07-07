@@ -1,3 +1,14 @@
+# -*- coding: utf-8 -*-
+# @file qwen_generation_utils.py
+# @author zhangshilong
+# @date 2024/7/7
+
+"""
+get_stop_words_ids、make_context、decode_tokens都是直接从Qwen代码中拷贝过来的，不要修改
+模仿chat接口的逻辑写批量推理接口batch，如果使用chat时GPU利用率不足100%，换成batch能提升速度（注意调整batch_size不要爆显存）
+使用时可以通过 from types import MethodType; model.batch = MethodType(batch, model) 添加为实例方法
+"""
+
 from typing import List
 from typing import Tuple
 from typing import Union
@@ -211,9 +222,10 @@ def batch(
 
     # 虽然make_context会同时返回context_tokens，但是难以padding，还是得依赖tokenizer
     batch_raw_text = [
-        make_context(tokenizer, query, system=system,
-                     max_window_size=model.generation_config.max_window_size,
-                     chat_format=model.generation_config.chat_format)[0]
+        make_context(
+            tokenizer, query, system=system,
+            max_window_size=model.generation_config.max_window_size,
+            chat_format=model.generation_config.chat_format)[0]
         for query in queries
     ]
 

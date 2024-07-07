@@ -5,12 +5,20 @@
 
 import platform
 from functools import partialmethod
+from types import MethodType
+from typing import Dict
 from typing import Optional
 
 import pandas as pd
+import torch
 from tqdm import tqdm
+from transformers import AutoModelForCausalLM
+from transformers import AutoTokenizer
+from transformers import GenerationConfig
 from transformers import set_seed
 
+from constant import ModelMode
+from qwen_generation_utils import batch
 from utils import File
 
 
@@ -52,6 +60,8 @@ class Config(metaclass=ConfigMeta):
     TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "test_question.csv")
     QUESTION_CATEGORY_PATH = File.join(INTERMEDIATE_DIR, "A2_question_category.csv")
 
+    MODEL_NAME = "Tongyi-Finance-14B-Chat-Int4"
+
     @classmethod
     def company_pdf_path(cls, cid: Optional[str] = None, company: Optional[str] = None):
         assert bool(cid) ^ bool(company), "cid和company参数必须且只能填其中一个"
@@ -67,6 +77,11 @@ class Config(metaclass=ConfigMeta):
             return File.join(cls.CID_TXT_DIR, f"{cid}.txt")
         else:
             return File.join(cls.COMPANY_TXT_DIR, f"{company}.txt")
+
+    @classmethod
+    def model_dir(cls, model_name: Optional[str] = None):
+        model_name = model_name or cls.MODEL_NAME
+        return File.join(cls.WORKSPACE_DIR, model_name)
 
     @classmethod
     def get_question_df(cls):
@@ -101,6 +116,74 @@ class Config(metaclass=ConfigMeta):
         question_category_df = pd.read_csv(cls.QUESTION_CATEGORY_PATH)
         assert len(question_category_df) == cls.QUESTION_NUM
         return question_category_df
+
+    @classmethod
+    def get_tokenizer(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, **kwargs):
+        assert mode in ModelMode.values()
+        # batch推理需要左padding，chat则不受影响。而训练需要右padding
+        padding_side = "left" if mode == ModelMode.EVAL else "right"
+
+        model_dir = cls.model_dir(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True, padding_side=padding_side,
+                                                  **kwargs)
+        tokenizer.pad_token_id = tokenizer.eod_id
+        return tokenizer
+
+    @classmethod
+    def get_model(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, device_map: str = "cuda",
+                  torch_dtype: Optional[str] = None, use_flash_attn: bool = True,
+                  generation_config: Optional[Dict[str, str]] = None, **kwargs):
+        assert mode in ModelMode.values()
+
+        model_name = model_name or cls.MODEL_NAME
+        model_dir = cls.model_dir(model_name)
+
+        if not torch_dtype:
+            torch_dtype = torch.float16 if "Int" in model_name else torch.bfloat16
+        if torch_dtype == torch.float16:
+            fp16, bf16, fp32 = True, False, False
+        elif torch_dtype == torch.bfloat16:
+            fp16, bf16, fp32 = False, True, False
+        elif torch_dtype == torch.float32:
+            fp16, bf16, fp32 = False, False, True
+        else:
+            raise ValueError(f"{torch_dtype=} must be one of torch.float16, torch.bfloat16 or torch.float32")
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_dir, trust_remote_code=True, device_map=device_map, torch_dtype=torch_dtype, fp16=fp16, bf16=bf16,
+            fp32=fp32, use_flash_attn=use_flash_attn, **kwargs)
+        assert model.device.type == device_map
+        assert model.dtype == torch_dtype
+
+        if use_flash_attn:
+            assert hasattr(model.transformer.h[0].attn, "core_attention_flash")
+            # rotary_embedding和rms_norm没办法检查
+
+        if "Int" in model_name:
+            # 使用exllama插件速度快好几倍
+            assert "exllama" in type(model.transformer.h[0].mlp.c_proj).__module__
+
+        if mode == ModelMode.EVAL:
+            model = model.eval()
+
+        generation_config = generation_config or dict()
+        model.generation_config = cls.get_generation_config(model_name, **generation_config)
+
+        # 添加batch方法
+        model.batch = MethodType(batch, model)
+
+        return model
+
+    @classmethod
+    def get_generation_config(cls, model_name: Optional[str] = None, do_sample: bool = False, **kwargs):
+        model_dir = cls.model_dir(model_name)
+        if not do_sample:
+            # 强制恢复成默认值，防止警告（即使主动输入）
+            kwargs.update(top_p=1, top_k=50)
+
+        generation_config = GenerationConfig.from_pretrained(
+            model_dir, trust_remote_code=True, do_sample=do_sample, **kwargs)
+        return generation_config
 
     @classmethod
     def set_seed(cls, seed: Optional[int] = None) -> None:

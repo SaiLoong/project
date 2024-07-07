@@ -1,17 +1,15 @@
-"""
-BATCH_NUM = 4
-responses = list()
-for start in tqdm(range(0, len(test_df), BATCH_NUM)):
-    chunk = test_df.iloc[start:start + BATCH_NUM]
-    questions = chunk["问题"].tolist()
-    prompts = [prompt_template_ref + question + "？" for question in questions]
-    responses.extend(model.batch(tokenizer, prompts))
+# -*- coding: utf-8 -*-
+# @file classification_prompt_storage.py
+# @author zhangshilong
+# @date 2024/7/7
 
-response_df = pd.concat([test_df, pd.Series(responses, name="回答")], axis=1)
-"""
+import pandas as pd
 
-#  最原始的ref prompt   99, 81
-prompt_template_ref_v0 = """
+model = NotImplemented
+tokenizer = NotImplemented
+
+#  原作者的prompt_template，正确数81，加上原作的后处理变成99
+prompt_template_v0 = """
     你是一个问题分类器。对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
 
     问题：“在2019年的中期报告里，XX基金管理有限公司管理的基金中，有多少比例的基金是个人投资者持有的份额超过机构投资者？希望得到一个精确到两位小数的百分比。”
@@ -85,16 +83,16 @@ prompt_template_ref_v0 = """
     """
 
 
-def chat_func_ref_v0(row):
+def chat_func_v0(row):
     question = row["问题"]
-    prompt = prompt_template_ref_v0 + question + """？"""
+    prompt = prompt_template_v0 + question + """？"""
     response, history = model.chat(tokenizer, prompt, history=None)
 
     return pd.Series({"回答": response})
 
 
-# 稍微改了结尾   98, 92
-prompt_template_ref_v1 = """
+# 稍微改了结尾，正确数92
+prompt_template_v1 = """
     你是一个问题分类器。对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
 
     问题：“在2019年的中期报告里，XX基金管理有限公司管理的基金中，有多少比例的基金是个人投资者持有的份额超过机构投资者？希望得到一个精确到两位小数的百分比。”
@@ -169,16 +167,16 @@ prompt_template_ref_v1 = """
     """
 
 
-def chat_func_ref_v1(row):
+def chat_func_v1(row):
     question = row["问题"]
-    prompt = prompt_template_ref_v1.format(question=question)
+    prompt = prompt_template_v1.format(question=question)
     response, history = model.chat(tokenizer, prompt, history=None)
 
     return pd.Series({"回答": response})
 
 
-# 把前面的行首的空格去掉   98, 96
-prompt_template_ref_v2 = """你是一个问题分类器。对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
+# 把行首的空格去掉，正确数96
+prompt_template_v2 = """你是一个问题分类器。对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
 
 问题：“在2019年的中期报告里，XX基金管理有限公司管理的基金中，有多少比例的基金是个人投资者持有的份额超过机构投资者？希望得到一个精确到两位小数的百分比。”
 回答：“基金股票数据库”
@@ -251,16 +249,17 @@ prompt_template_ref_v2 = """你是一个问题分类器。对于每个提供给�
 回答："""
 
 
-def chat_func_ref_v2(row):
+def chat_func_v2(row):
     question = row["问题"]
-    prompt = prompt_template_ref_v2.format(question=question)
+    prompt = prompt_template_v2.format(question=question)
     response, history = model.chat(tokenizer, prompt, history=None)
 
     return pd.Series({"回答": response})
 
 
-# 去掉引号   97, 97 。329、511、659本应是SQL，预测为Text
-prompt_template_ref_v3 = """你是一个问题分类器。对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
+# 去掉引号，正确数97
+# id=329、511、659本应是SQL，预测为Text
+prompt_template_v3 = """你是一个问题分类器。对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
 
 问题：在2019年的中期报告里，XX基金管理有限公司管理的基金中，有多少比例的基金是个人投资者持有的份额超过机构投资者？希望得到一个精确到两位小数的百分比。
 回答：基金股票数据库
@@ -333,16 +332,16 @@ prompt_template_ref_v3 = """你是一个问题分类器。对于每个提供给�
 回答："""
 
 
-def chat_func_ref_v3(row):
+def chat_func_v3(row):
     question = row["问题"]
-    prompt = prompt_template_ref_v3.format(question=question)
+    prompt = prompt_template_v3.format(question=question)
     response, history = model.chat(tokenizer, prompt, history=None)
 
     return pd.Series({"回答": response})
 
 
-# 统一为两个X   98, 96
-prompt_template_ref_v4 = """你是一个问题分类器。对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
+# 统一为两个X，正确数96
+prompt_template_v4 = """你是一个问题分类器。对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
 
 问题：在2019年的中期报告里，XX基金管理有限公司管理的基金中，有多少比例的基金是个人投资者持有的份额超过机构投资者？希望得到一个精确到两位小数的百分比。
 回答：基金股票数据库
@@ -415,16 +414,17 @@ prompt_template_ref_v4 = """你是一个问题分类器。对于每个提供给�
 回答："""
 
 
-def chat_func_ref_v4(row):
+def chat_func_v4(row):
     question = row["问题"]
-    prompt = prompt_template_ref_v4.format(question=question)
+    prompt = prompt_template_v4.format(question=question)
     response, history = model.chat(tokenizer, prompt, history=None)
 
     return pd.Series({"回答": response})
 
 
-# 将"你是一个问题分类器。"挪到system    100, 96。  如果do_sample=True, 98, 87
-prompt_template_ref_v5 = """对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
+# 将"你是一个问题分类器。"挪到system，正确数96
+# 如果do_sample=True，正确数87
+prompt_template_v5 = """对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：
 
 问题：在2019年的中期报告里，XX基金管理有限公司管理的基金中，有多少比例的基金是个人投资者持有的份额超过机构投资者？希望得到一个精确到两位小数的百分比。
 回答：基金股票数据库
@@ -497,24 +497,24 @@ prompt_template_ref_v5 = """对于每个提供给你的问题，你需要猜测�
 回答："""
 
 
-def chat_func_ref_v5(row):
+def chat_func_v5(row):
     question = row["问题"]
-    prompt = prompt_template_ref_v5.format(question=question)
+    prompt = prompt_template_v5.format(question=question)
     response, history = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
 
     return pd.Series({"回答": response})
 
 
-# zero-shot      99, 25  输出很多说话，耗时3:47
-prompt_template_ref_v6 = """对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。
+# zero-shot，正确数25。输出文本很长，耗时3:47（上面都是耗时1.5-2min）
+prompt_template_v6 = """对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。
 
 问题：{question}
 回答："""
 
 
-def chat_func_ref_v6(row):
+def chat_func_v6(row):
     question = row["问题"]
-    prompt = prompt_template_ref_v6.format(question=question)
+    prompt = prompt_template_v6.format(question=question)
     response, history = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
 
     return pd.Series({"回答": response})

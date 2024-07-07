@@ -26,3 +26,8 @@ class Label(Enum):
 
 
 Category = Label
+
+
+class ModelMode(Enum):
+    TRAIN = "train"
+    EVAL = "eval"
