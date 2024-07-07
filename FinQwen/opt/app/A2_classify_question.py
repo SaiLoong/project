@@ -2,6 +2,7 @@
 # @file A2_classify_question.py
 # @author zhangshilong
 # @date 2024/7/7
+# 利用规则对问题集分类
 
 import re
 

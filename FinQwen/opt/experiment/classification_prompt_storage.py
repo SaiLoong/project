@@ -4,6 +4,7 @@
 # @date 2024/7/7
 
 import pandas as pd
+from tqdm import tqdm
 
 model = NotImplemented
 tokenizer = NotImplemented
@@ -518,3 +519,19 @@ def chat_func_v6(row):
     response, history = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
 
     return pd.Series({"回答": response})
+
+
+# ==================================================================================
+
+test_question_df = NotImplemented
+
+# batch代码
+batch_size = 4
+responses = list()
+for start in tqdm(range(0, len(test_question_df), batch_size)):
+    chunk = test_question_df.iloc[start:start + batch_size]
+    questions = chunk["问题"].tolist()
+    prompts = [prompt_template_v0 + question + """？""" for question in questions]
+    responses.extend(model.batch(tokenizer, prompts))
+
+response_df = pd.concat([test_question_df, pd.Series(responses, name="回答")], axis=1)
