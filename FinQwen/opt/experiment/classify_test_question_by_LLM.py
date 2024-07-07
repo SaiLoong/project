@@ -12,7 +12,6 @@ tokenizer = Config.get_tokenizer()
 model = Config.get_model()
 
 test_question_df = Config.get_test_question_df()
-company_df, companies = Config.get_company_df(return_companies=True)
 
 # 从原作者的prompt_template逐渐修改，优化到可读性、效果最优，迭代过程和batch代码记录在classification_prompt_storage.py
 prompt_template_v5 = """对于每个提供给你的问题，你需要猜测答案是在该公司的招股说明书中还是在基金股票数据库里。以下是一些例子：

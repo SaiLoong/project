@@ -3,6 +3,9 @@
 # @author zhangshilong
 # @date 2024/7/7
 
+N_A = "N/A"
+
+
 class Enum:
     @classmethod
     def items(cls):
