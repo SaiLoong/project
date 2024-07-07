@@ -14,7 +14,7 @@ from ..tools.utils import File
 ref_company_df = Config.get_ref_company_df()
 
 # 将文件用公司重命名，方便查阅
-dst_dir = f"{Config.EXPERIMENT_DIR}/company_txt"
+dst_dir = f"{Config.EXPERIMENT_OUTPUT_DIR}/company_txt"
 File.makedirs(dst_dir)
 
 

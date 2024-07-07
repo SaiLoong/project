@@ -52,6 +52,7 @@ class Config(metaclass=ConfigMeta):
     REF_COMPANY_PATH = File.join(REFERENCE_DIR, "AF0_pdf_to_company.csv")
 
     EXPERIMENT_DIR = File.join(WORKSPACE_DIR, "experiment")
+    EXPERIMENT_OUTPUT_DIR = File.join(EXPERIMENT_DIR, "output")
 
     INTERMEDIATE_DIR = File.join(WORKSPACE_DIR, "intermediate")
     COMPANY_PATH = File.join(INTERMEDIATE_DIR, "A1_cid_to_company.csv")
@@ -160,7 +161,7 @@ class Config(metaclass=ConfigMeta):
             # rotary_embedding和rms_norm没办法检查
 
         if "Int" in model_name:
-            # 使用exllama插件速度快好几倍
+            # 使用exllama插件速度能x7+！！！
             assert "exllama" in type(model.transformer.h[0].mlp.c_proj).__module__
 
         if mode == ModelMode.EVAL:

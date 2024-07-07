@@ -4,6 +4,7 @@ opt: 自己的改进方案
     tools: 公共类集合
     intermediate: app代码跑出来的中间文件
     experiment: 实验代码，包括分析数据、想法实践等
+        output: 实验产生的输出文件
         storage: 存放杂七杂八的代码片段
 
 ref: 存放原作者的原始文件

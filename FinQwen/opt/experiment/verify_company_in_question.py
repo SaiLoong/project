@@ -16,8 +16,8 @@ ref_company_df = Config.get_ref_company_df()
 companies = ref_company_df["公司名称"].tolist()
 
 # 逐个匹配
-found_dict = {company: [] for company in companies}
-unfound_list = []
+found_dict = {company: list() for company in companies}
+unfound_list = list()
 pattern = "|".join(companies)
 for question in questions:
     if m := re.search(pattern, question):

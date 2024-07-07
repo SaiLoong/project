@@ -92,7 +92,7 @@ def chat_func_v5(row):
     prompt = prompt_template_v5.format(question=question)
     response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
 
-    return pd.Series({"回答": response})
+    return pd.Series({"回答": response, "prompt": prompt})
 
 
 chat_func = chat_func_v5
@@ -120,7 +120,7 @@ print(f'分类正确数：{category_df["分类正确"].sum()}')
 category_df.query("分类正确 == False")
 
 # 保存下来，不要浪费
-category_df.to_csv(f"{Config.EXPERIMENT_DIR}/question_category_by_LLM_v5.csv", index=False)
+category_df.to_csv(f"{Config.EXPERIMENT_OUTPUT_DIR}/question_category_by_LLM_v5.csv", index=False)
 
 """
 结论：V0原版纯LLM判断正确率81%，V5版本升至96%，后来发现规则直接100%，放弃这条路了

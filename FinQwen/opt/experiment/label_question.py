@@ -16,12 +16,13 @@ sample_df.sort_index(inplace=True)
 sample_df["标签"] = ""
 
 # 导出成json格式，方便填上标签
-sample_df.to_json(f"{Config.EXPERIMENT_DIR}/raw_test_question.json", orient="records", force_ascii=False, indent=4)
+sample_df.to_json(f"{Config.EXPERIMENT_OUTPUT_DIR}/raw_test_question.json", orient="records", force_ascii=False,
+                  indent=4)
 
 # 人工填上标签后另存为test_question.json, 放回experiment文件夹
 
 # 载入标好的数据
-test_question_df = pd.read_json(f"{Config.EXPERIMENT_DIR}/test_question.json")
+test_question_df = pd.read_json(f"{Config.EXPERIMENT_OUTPUT_DIR}/test_question.json")
 
 # 查看统计结果
 label_counts = test_question_df["标签"].value_counts()
