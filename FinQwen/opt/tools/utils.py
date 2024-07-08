@@ -3,6 +3,7 @@
 # @author zhangshilong
 # @date 2024/7/6
 
+import json
 import os
 import shutil
 from typing import Any
@@ -117,3 +118,13 @@ class File:
             raise FileNotFoundError(f"{src=} does not exist")
         else:
             raise TypeError(f"{src=} is neither file nor directory")
+
+    @classmethod
+    def json_dump(cls, obj: Any, path: str, *args, **kwargs) -> None:
+        with open(path, "w") as file:
+            json.dump(obj, file, *args, **kwargs)
+
+    @classmethod
+    def json_load(cls, path: str, *args, **kwargs) -> Any:
+        with open(path, "r") as file:
+            return json.load(file, *args, **kwargs)

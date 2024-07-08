@@ -57,6 +57,7 @@ class Config(metaclass=ConfigMeta):
 
     EXPERIMENT_DIR = File.join(WORKSPACE_DIR, "experiment")
     EXPERIMENT_OUTPUT_DIR = File.join(EXPERIMENT_DIR, "output")
+    EXPERIMENT_REFERENCE_DIR = File.join(EXPERIMENT_DIR, "reference")
 
     INTERMEDIATE_DIR = File.join(WORKSPACE_DIR, "intermediate")
     COMPANY_PATH = File.join(INTERMEDIATE_DIR, "A1_cid_to_company.csv")
@@ -122,6 +123,15 @@ class Config(metaclass=ConfigMeta):
     def get_question_category_df(cls):
         question_category_df = pd.read_csv(cls.QUESTION_CATEGORY_PATH)
         assert len(question_category_df) == cls.QUESTION_NUM
+
+        # TODO FIX 临时用补丁修正分类
+        classification_bad_case = File.json_load(f"{cls.EXPERIMENT_OUTPUT_DIR}/classification_bad_case.json")
+        for category, bad_cases in classification_bad_case.items():
+            qids = [case["id"] for case in bad_cases]
+            condition = question_category_df["问题id"].isin(qids)
+            question_category_df.loc[condition, "分类"] = category
+            print(f"[FIX] 将{len(qids)}条问题的分类改为{category}: {qids}")
+
         return question_category_df
 
     @classmethod
@@ -144,8 +154,8 @@ class Config(metaclass=ConfigMeta):
 
     @classmethod
     def get_model(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, device_map: str = "cuda",
-                  torch_dtype: Optional[str] = None, use_flash_attn: bool = True,
-                  generation_config: Optional[Dict[str, str]] = None, **kwargs):
+                  torch_dtype: Optional[str] = None, use_flash_attn: bool = True, use_dynamic_ntk: bool = True,
+                  use_logn_attn: bool = True, generation_config: Optional[Dict[str, str]] = None, **kwargs):
         assert mode in ModelMode.values()
 
         model_name = model_name or cls.MODEL_NAME
@@ -164,7 +174,8 @@ class Config(metaclass=ConfigMeta):
 
         model = AutoModelForCausalLM.from_pretrained(
             model_dir, trust_remote_code=True, device_map=device_map, torch_dtype=torch_dtype, fp16=fp16, bf16=bf16,
-            fp32=fp32, use_flash_attn=use_flash_attn, **kwargs)
+            fp32=fp32, use_flash_attn=use_flash_attn, use_dynamic_ntk=use_dynamic_ntk, use_logn_attn=use_logn_attn,
+            **kwargs)
         assert model.device.type == device_map
         assert model.dtype == torch_dtype
 

@@ -24,7 +24,7 @@ company_df = ref_company_df.progress_apply(func, axis=1)
 
 # 根据experiment的verify_company_name.py和verify_company_in_question.py分析结论，进行修正
 company_df.replace({"公司名称": "沈阳晶格自动化技术有限公司"}, "深圳麦格米特电气股份有限公司", inplace=True)
-assert company_df.iloc[33]["公司名称"] == "深圳麦格米特电气股份有限公司"
+assert company_df.loc[33, "公司名称"] == "深圳麦格米特电气股份有限公司"
 
 # 保存修正后的映射表
 company_df.to_csv(Config.COMPANY_PATH, index=False)
