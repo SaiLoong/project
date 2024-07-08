@@ -51,6 +51,11 @@ for cyc in range(1000):
                     break
                 except:
                     pass
+    
+
+    if len(SQL_exe_result)>400:
+        SQL_exe_result = SQL_exe_result[0:400]
+
 
     csvwriter.writerow([str(new_question_file[cyc:(cyc+1)]['问题id'][cyc]),
                     str(new_question_file[cyc:(cyc+1)]['问题'][cyc]),
