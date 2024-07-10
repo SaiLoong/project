@@ -41,7 +41,7 @@ class ConfigMeta(type):
 class Config(metaclass=ConfigMeta):
     SEED = 1024
     QUESTION_NUM = 1000
-    TEST_QUESTION_NUM = 100
+    SAMPLE_QUESTION_NUM = 100
     COMPANY_NUM = 80
 
     WORKSPACE_DIR = "/mnt/workspace"
@@ -116,7 +116,7 @@ class Config(metaclass=ConfigMeta):
     @classmethod
     def get_test_question_df(cls):
         test_question_df = pd.read_csv(cls.TEST_QUESTION_PATH)
-        assert len(test_question_df) == cls.TEST_QUESTION_NUM
+        assert len(test_question_df) >= cls.SAMPLE_QUESTION_NUM
         return test_question_df
 
     @classmethod
@@ -162,6 +162,7 @@ class Config(metaclass=ConfigMeta):
         model_dir = cls.model_dir(model_name)
 
         if not torch_dtype:
+            # 量化就算用bf16，推理时还是要先转为fp16
             torch_dtype = torch.float16 if "Int" in model_name else torch.bfloat16
         if torch_dtype == torch.float16:
             fp16, bf16, fp32 = True, False, False
@@ -172,6 +173,7 @@ class Config(metaclass=ConfigMeta):
         else:
             raise ValueError(f"{torch_dtype=} must be one of torch.float16, torch.bfloat16 or torch.float32")
 
+        print(f"loading model {model_name}...")
         model = AutoModelForCausalLM.from_pretrained(
             model_dir, trust_remote_code=True, device_map=device_map, torch_dtype=torch_dtype, fp16=fp16, bf16=bf16,
             fp32=fp32, use_flash_attn=use_flash_attn, use_dynamic_ntk=use_dynamic_ntk, use_logn_attn=use_logn_attn,
@@ -183,8 +185,8 @@ class Config(metaclass=ConfigMeta):
             assert hasattr(model.transformer.h[0].attn, "core_attention_flash")
             # rotary_embedding和rms_norm没办法检查
 
-        if "Int" in model_name:
-            # 使用exllama插件速度能x7+！！！
+        if "Int4" in model_name:
+            # 使用exllama插件速度能x7+！！！但Int8用不了
             assert "exllama" in type(model.transformer.h[0].mlp.c_proj).__module__
 
         if mode == ModelMode.EVAL:

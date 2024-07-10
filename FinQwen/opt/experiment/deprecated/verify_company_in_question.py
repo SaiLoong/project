@@ -2,10 +2,11 @@
 # @file verify_company_in_question.py
 # @author zhangshilong
 # @date 2024/7/7
+# deprecated 比较难发现bad case，用aggregate_question.py的聚类方法更有效
 
 import re
 
-from ..tools.config import Config
+from ...tools.config import Config
 
 # 获取问题
 question_df = Config.get_question_df()

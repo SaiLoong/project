@@ -25,6 +25,9 @@ class Enum:
 
 class ModelName(Enum):
     QWEN_1_8B_CHAT = "Qwen-1_8B-Chat"
+    QWEN_7B_CHAT = "Qwen-7B-Chat"
+    QWEN_14B_CHAT_INT4 = "Qwen-14B-Chat-Int4"
+    QWEN_14B_CHAT_INT8 = "Qwen-14B-Chat-Int8"
 
     # TONGYI_FINANCE_14B_CHAT = "Tongyi-Finance-14B-Chat"
     TONGYI_FINANCE_14B_CHAT_INT4 = "Tongyi-Finance-14B-Chat-Int4"

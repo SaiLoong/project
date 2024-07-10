@@ -3,8 +3,12 @@
 # @author zhangshilong
 # @date 2024/7/7
 
+from string import Template
+
 import pandas as pd
 from tqdm import tqdm
+
+from ...tools.constant import Category
 
 model = NotImplemented
 tokenizer = NotImplemented
@@ -89,7 +93,7 @@ def chat_func_v0(row):
     prompt = prompt_template_v0 + question + """？"""
     response, history = model.chat(tokenizer, prompt, history=None)
 
-    return pd.Series({"回答": response})
+    return pd.Series({"回答": response, "prompt": prompt})
 
 
 # 稍微改了结尾，正确数92
@@ -501,9 +505,9 @@ prompt_template_v5 = """对于每个提供给你的问题，你需要猜测答�
 def chat_func_v5(row):
     question = row["问题"]
     prompt = prompt_template_v5.format(question=question)
-    response, history = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
 
-    return pd.Series({"回答": response})
+    return pd.Series({"回答": response, "prompt": prompt})
 
 
 # zero-shot，正确数25。输出文本很长，耗时3:47（上面都是耗时1.5-2min）
@@ -521,7 +525,514 @@ def chat_func_v6(row):
     return pd.Series({"回答": response})
 
 
+companies = NotImplemented
+tables = NotImplemented
+
+# 重新设计，提供资料，zero-shot
+# 40.00%，44/110，6min左右，回答太长，并且貌似没有用上材料
+prompt_template_v7 = f"""任务描述：
+对于给定的问题，你需要根据提供的资料回答该问题应该在“招股说明书”还是“基金股票数据库”中寻找答案。
+
+资料：
+提供招股说明书的公司：{companies}
+基金股票数据库的表名：{tables}
+
+你要回答的问题：{{question}}
+你的回答："""
+
+
+def chat_func_v7(row):
+    question = row["问题"]
+    prompt = prompt_template_v7.format(question=question)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# 在test表外找8个原题作为例子
+# 28.18%，31/110，4:00，很多回答依然很长
+prompt_template_v8 = f"""任务描述：
+对于给定的问题，你需要根据提供的资料回答该问题应该在“招股说明书”还是“基金股票数据库”中寻找答案。
+
+
+资料：
+提供招股说明书的公司：{"、".join(companies)}
+基金股票数据库的表名：{"、".join(tables)}
+
+
+下面是一些例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+回答：招股说明书
+
+问题：读者出版传媒股份有限公司董事是谁？
+回答：招股说明书
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+回答：基金股票数据库
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+回答：基金股票数据库
+
+问题：湖南南岭民用爆破器材股份有限公司主要业务是什么？
+回答：招股说明书
+
+问题：我想知道在20211231的季报里，中信保诚红利精选混合C投资的股票分别是哪些申万一级行业？
+回答：基金股票数据库
+
+问题：浙江开尔新材料股份有限公司成立时主要产品有什么？
+回答：招股说明书
+
+问题：帮我查一下广发瑞安精选股票A基金在20211222的资产净值和单位净值是多少?
+回答：基金股票数据库
+
+
+下面是你要回答的问题，请仿照上面例子的格式回答
+问题：{{question}}
+回答："""
+
+
+def chat_func_v8(row):
+    question = row["问题"]
+    prompt = prompt_template_v8.format(question=question)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
 # ==================================================================================
+# 从v9开始，模型改用Qwen-14B-Chat-Int4，正确率包括精确匹配与包含匹配
+
+# 把v8的”问题-回答“改成”问题-分类“
+# 7/10，10/10
+prompt_template_v9 = f"""任务描述：
+对于给定的问题，你需要根据提供的资料回答该问题应该在“招股说明书”还是“基金股票数据库”中寻找答案。
+
+
+资料：
+提供招股说明书的公司：{"、".join(companies)}
+基金股票数据库的表名：{"、".join(tables)}
+
+
+下面是一些例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+分类：招股说明书
+
+问题：读者出版传媒股份有限公司董事是谁？
+分类：招股说明书
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+分类：基金股票数据库
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+分类：基金股票数据库
+
+问题：湖南南岭民用爆破器材股份有限公司主要业务是什么？
+分类：招股说明书
+
+问题：我想知道在20211231的季报里，中信保诚红利精选混合C投资的股票分别是哪些申万一级行业？
+分类：基金股票数据库
+
+问题：浙江开尔新材料股份有限公司成立时主要产品有什么？
+分类：招股说明书
+
+问题：帮我查一下广发瑞安精选股票A基金在20211222的资产净值和单位净值是多少?
+分类：基金股票数据库
+
+
+下面是你要回答的问题，请仿照上面例子的格式回答
+问题：{{question}}
+分类："""
+
+
+def chat_func_v9(row):
+    question = row["问题"]
+    prompt = prompt_template_v9.format(question=question)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# 优化了指令
+# 109/110，109/110
+prompt_template_v10 = f"""任务描述：
+你需要根据资料将问题分类为“招股说明书”或者“基金股票数据库”。不要回答问题，只需要将问题分类
+
+
+资料：
+提供招股说明书的公司：{"、".join(companies)}
+基金股票数据库的表名：{"、".join(tables)}
+
+
+下面是一些例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+分类：招股说明书
+
+问题：读者出版传媒股份有限公司董事是谁？
+分类：招股说明书
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+分类：基金股票数据库
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+分类：基金股票数据库
+
+问题：湖南南岭民用爆破器材股份有限公司主要业务是什么？
+分类：招股说明书
+
+问题：我想知道在20211231的季报里，中信保诚红利精选混合C投资的股票分别是哪些申万一级行业？
+分类：基金股票数据库
+
+问题：浙江开尔新材料股份有限公司成立时主要产品有什么？
+分类：招股说明书
+
+问题：帮我查一下广发瑞安精选股票A基金在20211222的资产净值和单位净值是多少?
+分类：基金股票数据库
+
+
+请仿照上面例子的格式对以下问题进行分类：
+问题：{{question}}
+分类："""
+
+
+def chat_func_v10(row):
+    question = row["问题"]
+    prompt = prompt_template_v10.format(question=question)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# 删掉资料
+# 110/110，110/110
+prompt_template_v11 = f"""任务描述：
+你需要将问题分类为“招股说明书”或者“基金股票数据库”。不要回答问题，只需要将问题分类
+
+
+下面是一些例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+分类：招股说明书
+
+问题：读者出版传媒股份有限公司董事是谁？
+分类：招股说明书
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+分类：基金股票数据库
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+分类：基金股票数据库
+
+问题：湖南南岭民用爆破器材股份有限公司主要业务是什么？
+分类：招股说明书
+
+问题：我想知道在20211231的季报里，中信保诚红利精选混合C投资的股票分别是哪些申万一级行业？
+分类：基金股票数据库
+
+问题：浙江开尔新材料股份有限公司成立时主要产品有什么？
+分类：招股说明书
+
+问题：帮我查一下广发瑞安精选股票A基金在20211222的资产净值和单位净值是多少?
+分类：基金股票数据库
+
+
+请参考上面例子对以下问题进行分类：
+问题：{{question}}
+分类："""
+
+
+def chat_func_v11(row):
+    question = row["问题"]
+    prompt = prompt_template_v11.format(question=question)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# ==================================================================================
+
+
+# 将例子变为4个
+# 109/110，109/110
+prompt_template_v12 = f"""任务描述：
+你需要将问题分类为“招股说明书”或者“基金股票数据库”。不要回答问题，只需要将问题分类
+
+
+下面是一些例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+分类：招股说明书
+
+问题：读者出版传媒股份有限公司董事是谁？
+分类：招股说明书
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+分类：基金股票数据库
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+分类：基金股票数据库
+
+
+请参考上面例子对以下问题进行分类：
+问题：{{question}}
+分类："""
+
+
+def chat_func_v12(row):
+    question = row["问题"]
+    prompt = prompt_template_v12.format(question=question)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# ========================================================================================
+
+company_str = "、".join(companies)
+table_str = "、".join(tables)
+
+# 要求输出json格式
+# 107/110, 107/110
+prompt_template_v13 = Template("""任务描述：
+你需要根据资料将问题分类为“招股说明书”或者“基金股票数据库”，以json格式输出。不要回答问题。
+
+
+资料：
+提供招股说明书的公司：$company_str
+基金股票数据库的表名：$table_str
+
+
+下面是一些例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+输出：{"分类": "招股说明书"}
+
+问题：读者出版传媒股份有限公司董事是谁？
+输出：{"分类": "招股说明书"}
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+输出：{"分类": "基金股票数据库"}
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+输出：{"分类": "基金股票数据库"}
+
+
+请参考上面例子对以下问题进行分类：
+问题：$question
+输出：""")
+
+
+def chat_func_v13(row):
+    question = row["问题"]
+    prompt = prompt_template_v13.substitute(question=question, company_str=company_str, table_str=table_str)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# 恢复为8个例子、声明遵循json格式
+# 109/110，109/110
+prompt_template_v14 = Template("""任务描述：
+你需要根据资料将问题分类为“招股说明书”或者“基金股票数据库”，以json格式输出。不要回答问题。
+
+
+资料：
+提供招股说明书的公司：$company_str
+基金股票数据库的表名：$table_str
+
+
+下面是一些例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+输出：{"分类": "招股说明书"}
+
+问题：读者出版传媒股份有限公司董事是谁？
+输出：{"分类": "招股说明书"}
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+输出：{"分类": "基金股票数据库"}
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+输出：{"分类": "基金股票数据库"}
+
+问题：湖南南岭民用爆破器材股份有限公司主要业务是什么？
+输出：{"分类": "招股说明书"}
+
+问题：我想知道在20211231的季报里，中信保诚红利精选混合C投资的股票分别是哪些申万一级行业？
+输出：{"分类": "基金股票数据库"}
+
+问题：浙江开尔新材料股份有限公司成立时主要产品有什么？
+输出：{"分类": "招股说明书"}
+
+问题：帮我查一下广发瑞安精选股票A基金在20211222的资产净值和单位净值是多少?
+输出：{"分类": "基金股票数据库"}
+
+
+请参考上面例子对以下问题进行分类，并严格按照例子的格式输出json：
+问题：$question
+输出：""")
+
+
+def chat_func_v14(row):
+    question = row["问题"]
+    prompt = prompt_template_v14.substitute(question=question, company_str=company_str, table_str=table_str)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# json键值修改了；除了分类，还要输出实体识别
+# 105/110（95.45%），41/53（77.36%）
+prompt_template_v15 = Template("""任务描述：
+你需要根据资料将问题分类为"Text"或者"SQL"，以json格式输出。不要回答问题。
+
+
+资料：
+提供招股说明书的公司：$company_str
+基金股票数据库的表名：$table_str
+
+
+下面是一些例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+输出：{"问题分类": "Text", "公司名称": "广东银禧科技股份有限公司"}
+
+问题：读者出版传媒股份有限公司董事是谁？
+输出：{"问题分类": "Text", "公司名称": "读者出版传媒股份有限公司"}
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+输出：{"问题分类": "SQL"}
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+输出：{"问题分类": "SQL"}
+
+问题：湖南南岭民用爆破器材股份有限公司主要业务是什么？
+输出：{"问题分类": "Text", "公司名称": "湖南南岭民用爆破器材股份有限公司"}
+
+问题：我想知道在20211231的季报里，中信保诚红利精选混合C投资的股票分别是哪些申万一级行业？
+输出：{"问题分类": "SQL"}
+
+问题：浙江开尔新材料股份有限公司成立时主要产品有什么？
+输出：{"问题分类": "Text", "公司名称": "浙江开尔新材料股份有限公司"}
+
+问题：帮我查一下广发瑞安精选股票A基金在20211222的资产净值和单位净值是多少?
+输出：{"问题分类": "SQL"}
+
+
+请参考上面例子对以下问题进行分类，并严格按照例子的格式输出json：
+问题：$question
+输出：""")
+
+
+def chat_func_v15(row):
+    question = row["问题"]
+    prompt = prompt_template_v15.substitute(question=question, company_str=company_str, table_str=table_str)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# ==================================================================================
+
+# 109/110，109/110
+prompt_template_v20 = f"""任务描述：
+你需要根据资料将问题分类为“招股说明书”或者“基金股票数据库”。不要回答问题！只需要将问题分类！
+如果在问题中找到提供招股说明书的公司名称或简称，应该将其分类为“招股说明书”，否则将其分类为“基金股票数据库”。
+
+
+资料：
+提供招股说明书的公司：{"、".join(companies)}
+基金股票数据库的表名：{"、".join(tables)}
+
+
+例子：
+问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+分类：招股说明书
+
+问题：读者出版传媒股份有限公司董事是谁？
+分类：招股说明书
+
+问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+分类：基金股票数据库
+
+问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+分类：基金股票数据库
+
+问题：湖南南岭民用爆破器材股份有限公司主要业务是什么？
+分类：招股说明书
+
+问题：我想知道在20211231的季报里，中信保诚红利精选混合C投资的股票分别是哪些申万一级行业？
+分类：基金股票数据库
+
+问题：浙江开尔新材料股份有限公司成立时主要产品有什么？
+分类：招股说明书
+
+问题：帮我查一下广发瑞安精选股票A基金在20211222的资产净值和单位净值是多少?
+分类：基金股票数据库
+
+
+请对以下问题进行分类，只需给出分类结果，不要输出其它的内容，不要重复问题：
+问题：{{question}}
+分类："""
+
+
+def chat_func_v20(row):
+    question = row["问题"]
+    prompt = prompt_template_v20.format(question=question)
+    response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
+
+    return pd.Series({"回答": response, "prompt": prompt})
+
+
+# ==================================================================================
+
+
+# 输出"招股说明书"或者"基金股票数据库"
+def category_func_v1(row):
+    response = row["回答"]
+
+    # 精确匹配
+    if response == "招股说明书":
+        category1 = Category.TEXT
+    elif response == "基金股票数据库":
+        category1 = Category.SQL
+    else:
+        category1 = "Unknown"
+
+    # 包含匹配
+    if "招股说明书" in response and "股票数据库" not in response:
+        category2 = Category.TEXT
+    elif "招股说明书" not in response and "股票数据库" in response:
+        category2 = Category.SQL
+    else:
+        category2 = "Unknown"
+
+    return pd.Series({"分类1": category1, "分类2": category2})
+
+
+category_df = NotImplemented
+
+n = 2
+for i in range(1, n + 1):
+    # 展示分类效果
+    category_df[f"分类{i}正确"] = category_df["标签"] == category_df[f"分类{i}"]
+    question_num = len(category_df)
+    correct_num = category_df[f"分类{i}正确"].sum()
+
+    print(f"\n\n分类{i}:")
+    print(f"测试问题数： {question_num}")  # 110
+    print(f"分类正确数：{correct_num}")
+    print(f"分类正确率：{correct_num / question_num:.2%}")
+
+    # 展示bad case
+    print(f"\nbad case:")
+    for _, row in category_df.query(f"分类{i}正确 == False").iterrows():
+        question = row["问题"]
+        answer = row["回答"]
+        label = row["标签"]
+        category = row[f"分类{i}"]
+        print(f"{question=}")
+        print(f"{answer=}")
+        print(f"{label=}")
+        print(f"{category=}")
+        print()
+
+# ==================================================================================
+
 
 test_question_df = NotImplemented
 
@@ -531,7 +1042,7 @@ responses = list()
 for start in tqdm(range(0, len(test_question_df), batch_size)):
     chunk = test_question_df.iloc[start:start + batch_size]
     questions = chunk["问题"].tolist()
-    prompts = [prompt_template_v0 + question + """？""" for question in questions]
-    responses.extend(model.batch(tokenizer, prompts))
+    prompts = [prompt_template_v5.format(question=question) for question in questions]
+    responses.extend(model.batch(tokenizer, prompts, system="你是一个问题分类器。"))
 
 response_df = pd.concat([test_question_df, pd.Series(responses, name="回答")], axis=1)

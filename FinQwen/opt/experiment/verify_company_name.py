@@ -75,7 +75,7 @@ print(f"{len(entires)=} {len(colons1)=} {len(colons2)=} {len(founds)=} {len(unfo
 
 
 """
-结论：经过人工复核，有3个错误。founds的两个对问题检索有利，维持不变；unfounds的需要修正
+结论：经过人工复核，有3个错误。需要修正
 
 founds:
 旷达汽车织物集团股份有限公司 -> 江苏旷达汽车织物集团股份有限公司    question出现7次，只有1次（524）没有加江苏

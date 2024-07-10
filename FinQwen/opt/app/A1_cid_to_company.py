@@ -22,9 +22,16 @@ def func(row):
 
 company_df = ref_company_df.progress_apply(func, axis=1)
 
-# 根据experiment的verify_company_name.py和verify_company_in_question.py分析结论，进行修正
-company_df.replace({"公司名称": "沈阳晶格自动化技术有限公司"}, "深圳麦格米特电气股份有限公司", inplace=True)
-assert company_df.loc[33, "公司名称"] == "深圳麦格米特电气股份有限公司"
+# 根据experiment的verify_company_name.py结论进行修正
+company_rename_mapping = {
+    "旷达汽车织物集团股份有限公司": "江苏旷达汽车织物集团股份有限公司",
+    "山东海看网络科技有限公司": "海看网络科技（山东）股份有限公司",
+    "沈阳晶格自动化技术有限公司": "深圳麦格米特电气股份有限公司"
+}
+company_df.replace({"公司名称": company_rename_mapping}, inplace=True)
+keys, values = zip(*company_rename_mapping.items())
+assert company_df.query(f"公司名称 in {keys}").empty
+assert len(company_df.query(f"公司名称 in {values}")) == len(values)
 
 # 保存修正后的映射表
 company_df.to_csv(Config.COMPANY_PATH, index=False)
