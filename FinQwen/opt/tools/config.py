@@ -23,6 +23,7 @@ from qwen_utils import batch
 from qwen_utils import batch_decode_each
 from qwen_utils import cut
 from qwen_utils import decode_each
+from qwen_utils import pairwise_scores
 from utils import File
 
 
@@ -145,10 +146,11 @@ class Config(metaclass=ConfigMeta):
                                                   **kwargs)
         tokenizer.pad_token_id = tokenizer.eod_id
 
-        # 添加decode_each、batch_decode_each、cut方法
+        # 添加方法
         tokenizer.decode_each = MethodType(decode_each, tokenizer)
         tokenizer.batch_decode_each = MethodType(batch_decode_each, tokenizer)
         tokenizer.cut = MethodType(cut, tokenizer)
+        tokenizer.pairwise_scores = MethodType(pairwise_scores, tokenizer)
 
         return tokenizer
 

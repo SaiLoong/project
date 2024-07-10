@@ -12,6 +12,9 @@ from ..tools.config import Config
 from ..tools.constant import Category
 from ..tools.constant import ModelName
 
+# TODO prompt的实验差不多了，暂时搁置
+
+
 # 根据test_LLM_classification_ability.py的结论，Qwen-14B-Chat-Int4做分类任务效果最好
 model_name = ModelName.QWEN_14B_CHAT_INT4
 tokenizer = Config.get_tokenizer(model_name)
@@ -29,57 +32,89 @@ tables = ["基金基本信息", "基金股票持仓明细", "基金债券持仓�
 company_str = "、".join(companies)
 table_str = "、".join(tables)
 
+"""
+不要回答问题
+
+，并严格按照例子的格式输出json
+"""
+
 # TODO 这些例子是test表以外的原题！！！
-prompt_template_v15 = Template("""任务描述：
-你需要根据资料将问题分类为"Text"或者"SQL"，以json格式输出。不要回答问题。
+prompt_template_v18 = Template("""任务描述：
+对于给定的问题，你需要分析它的答案应该在资料提供的招股说明书还是基金股票数据库中。
+如果你认为答案在招股说明书中，将其分类为"Text"，并提供公司名称。问题中提及的公司可能采用简称或别称，你必须在资料提供的公司名单中找到对应的全称。最后输出：{"问题分类": "Text", "公司名称": "你找到的公司名称全称"}
+如果你认为答案在基金股票数据库中，将其分类为"SQL"，输出：{"问题分类": "SQL"}
 
 
-资料：
-提供招股说明书的公司：$company_str
+提供的资料：
+招股说明书的公司名单：$company_str
 基金股票数据库的表名：$table_str
 
 
 下面是一些例子：
-问题：为什么广东银禧科技股份有限公司核心技术大部分为非专利技术？
+问题：为什么银禧科技（广东）股份有限公司核心技术大部分为非专利技术？
+思考：问题中的"银禧科技（广东）股份有限公司"表示公司名称，与招股说明书名单中的"广东银禧科技股份有限公司"匹配，因此应该将该问题分类为"Text"。
 输出：{"问题分类": "Text", "公司名称": "广东银禧科技股份有限公司"}
 
 问题：读者出版传媒股份有限公司董事是谁？
+思考：问题中的"读者出版传媒股份有限公司"表示公司名称，与招股说明书名单中的"读者出版传媒股份有限公司"匹配，因此应该将该问题分类为"Text"。
 输出：{"问题分类": "Text", "公司名称": "读者出版传媒股份有限公司"}
 
 问题：在20201022，按照中信行业分类的行业划分标准，哪个一级行业的A股公司数量最多？
+思考：问题中没有找到公司名称，但包含"A股"等与基金股票数据库相关的关键字，因此应该将该问题分类为"SQL"。
 输出：{"问题分类": "SQL"}
 
 问题：请帮我计算，代码为603937的股票，2020年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。
+思考：问题中没有找到公司名称，但包含"股票"等与基金股票数据库相关的关键字，因此应该将该问题分类为"SQL"。
 输出：{"问题分类": "SQL"}
 
-问题：湖南南岭民用爆破器材股份有限公司主要业务是什么？
+问题：南岭民用爆破器材（湖南）股份有限公司主要业务是什么？
+思考：问题中的"南岭民用爆破器材（湖南）股份有限公司"表示公司名称，与招股说明书名单中的"湖南南岭民用爆破器材股份有限公司"匹配，因此应该将该问题分类为"Text"。
 输出：{"问题分类": "Text", "公司名称": "湖南南岭民用爆破器材股份有限公司"}
 
 问题：我想知道在20211231的季报里，中信保诚红利精选混合C投资的股票分别是哪些申万一级行业？
+思考：问题中没有找到公司名称，但包含"股票"等与基金股票数据库相关的关键字，因此应该将该问题分类为"SQL"。
 输出：{"问题分类": "SQL"}
 
-问题：浙江开尔新材料股份有限公司成立时主要产品有什么？
+问题：开尔股份成立时主要产品有什么？
+思考：问题中的"开尔股份"表示公司名称，与招股说明书名单中的"浙江开尔新材料股份有限公司"匹配，因此应该将该问题分类为"Text"。
 输出：{"问题分类": "Text", "公司名称": "浙江开尔新材料股份有限公司"}
 
 问题：帮我查一下广发瑞安精选股票A基金在20211222的资产净值和单位净值是多少?
+思考：问题中没有找到公司名称，但包含"股票"等与基金股票数据库相关的关键字，因此应该将该问题分类为"SQL"。
+输出：{"问题分类": "SQL"}
+
+问题：山东海看网络科技有限公司成立时，主要发起人是谁？
+思考：问题中的"山东海看网络科技有限公司"表示公司名称，与招股说明书名单中的"海看网络科技（山东）股份有限公司"匹配，因此应该将该问题分类为"Text"。
+输出：{"问题分类": "Text", "公司名称": "海看网络科技（山东）股份有限公司"}
+
+问题：请帮我查询在2021年,易方达基金管理有限公司成立哪种类型的基金个数最多?
+思考：问题中的"易方达基金管理有限公司"表示公司名称，但招股说明书名单中并没有公司与之匹配，同时问题包含"基金"等与基金股票数据库相关的关键字，因此应该将该问题分类为"SQL"。
 输出：{"问题分类": "SQL"}
 
 
-请参考上面例子对以下问题进行分类，并严格按照例子的格式输出json：
+请参考上面例子对以下问题进行分类，不需要回答问题、不需要展示你的思考过程，直接输出json即可：
 问题：$question
 输出：""")
 
 
-def chat_func_v15(row):
+def chat_func_v18(row):
     question = row["问题"]
-    prompt = prompt_template_v15.substitute(question=question, company_str=company_str, table_str=table_str)
+    prompt = prompt_template_v18.substitute(question=question, company_str=company_str, table_str=table_str)
     response, _ = model.chat(tokenizer, prompt, history=None, system="你是一个问题分类器。")
 
-    return pd.Series({"回答": response, "prompt": prompt})
+    return pd.Series({"回答": response,
+                      # "prompt": prompt
+                      })
 
 
-chat_func = chat_func_v15
-df = test_question_df.sample(10, random_state=Config.SEED).sort_index()
+chat_func = chat_func_v18
+# df = test_question_df.sample(10, random_state=Config.SEED).sort_index()
+qids = [
+    524, 280, 451, 34, 287,
+    203, 706, 831, 599, 787,
+    150, 217, 341, 501, 810, 879
+]
+df = test_question_df.query(f"问题id in {qids}").sort_index()
 # df = test_question_df
 response_df = pd.concat([df, df.progress_apply(chat_func, axis=1)], axis=1)
 
@@ -115,6 +150,9 @@ def category_func_v2(row):
 category_func = category_func_v2
 category_df = pd.concat([response_df, response_df.progress_apply(category_func, axis=1)], axis=1)
 
+# =========================================================
+
+
 # 展示分类效果
 category_df["分类正确"] = category_df["问题标签"] == category_df["问题分类"]
 question_num = len(category_df)
@@ -137,7 +175,7 @@ print(f"公司名称识别正确率：{company_correct_num / text_num:.2%}")
 text_df.query("公司名称识别正确 == False")
 
 # 保存下来，不要浪费
-category_df.to_csv(f"{Config.EXPERIMENT_OUTPUT_DIR}/question_category_by_LLM_v15.csv", index=False)
+# category_df.to_csv(f"{Config.EXPERIMENT_OUTPUT_DIR}/question_category_by_LLM_v15.csv", index=False)
 
 """
 结论：

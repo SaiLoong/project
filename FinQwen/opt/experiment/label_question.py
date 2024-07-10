@@ -58,7 +58,7 @@ test_question_df.progress_apply(func, axis=1)
 
 # 查看统计结果
 label_counts = test_question_df["问题标签"].value_counts()
-print(f"{label_counts=}")  # 57个SQL, 43个Text
+print(f"{label_counts=}")  # 56个SQL, 44个Text
 
 # 分类打印出来，复验是否标错
 for label, df in test_question_df.groupby("问题标签"):

@@ -6,40 +6,43 @@
 
 import re
 
-import pandas as pd
+import numpy as np
 
 from ..tools.config import Config
 from ..tools.constant import Category
-from ..tools.constant import NA
+
+tokenizer = Config.get_tokenizer()
 
 question_df = Config.get_question_df()
-company_df, companies = Config.get_company_df(return_companies=True)
+questions = question_df["问题"].tolist()
 
-# 根据experiment.classify_test_question_by_rule.py的测试结果，最简单的规则效果反而最好
-# 简单判断问题内有没有公司名，有就是Text，没有就是SQL
-pattern = "|".join(companies)
+company_df, companies = Config.get_company_df(return_companies=True)
 company_to_cid_mapping = company_df.set_index(keys="公司名称")["公司id"].to_dict()
 
+# 根据experiment.classify_test_question_by_rule.py的测试结果，最简单的规则效果反而最好
+# 利用jaccard相似度对问题匹配公司，阈值0.1，外加一些关键词过滤
+similarity_matrix = tokenizer.pairwise_scores(questions, companies)  # shape: 1000*80
+max_similar_scores = similarity_matrix.max(axis=1)
+max_similar_indices = similarity_matrix.argmax(axis=1)
+max_similar_companies = [companies[index] for index in max_similar_indices]
 
-def func(row):
-    question = row["问题"]
-    if m := re.search(pattern, question):
-        category = Category.TEXT
-        company = m.group()
-        cid = company_to_cid_mapping[company]
-    else:
-        category = Category.SQL
-        company = NA
-        cid = NA
+# 要求问题与公司的相似度大于阈值且不含基金、股票等关键字才认为是Text
+threshold = 0.05
+pattern = "基金|股票"
+cond1 = max_similar_scores > threshold
+cond2 = [re.search(pattern, question) is None for question in questions]
+is_text = np.logical_and(cond1, cond2)
 
-    return pd.Series({"分类": category, "公司名称": company, "公司id": cid})
-
-
-category_df = pd.concat([question_df, question_df.progress_apply(func, axis=1)], axis=1)
+category_df = question_df.copy()
+category_df["问题分类"] = np.where(is_text, Category.TEXT, Category.SQL)
+category_df["公司名称"] = np.where(is_text, max_similar_companies, np.nan)
+# 上一步numpy将np.nan转为"nan"，修正它
+category_df.replace("nan", np.nan, inplace=True)
+category_df["公司id"] = category_df["公司名称"].map(company_to_cid_mapping)
 
 # 查看分类比例
-category_counts = category_df["分类"].value_counts()
-print(f"{category_counts=}")  # 611个SQL, 389个Text
+category_counts = category_df["问题分类"].value_counts()
+print(f"{category_counts=}")  # 599个SQL, 401个Text
 
 # 保存
 category_df.to_csv(Config.QUESTION_CATEGORY_PATH, index=False)

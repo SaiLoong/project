@@ -86,3 +86,8 @@ distance_matrix = pairwise_distances(vectors, metric="jaccard")
 labels = SpectralClustering(n_clusters=4, affinity="precomputed_nearest_neighbors",
                             n_neighbors=4,
                             verbose=True).fit_predict(distance_matrix)
+
+
+from sklearn.metrics import jaccard_score
+
+jaccard_score(vectors[0] , vectors[0])

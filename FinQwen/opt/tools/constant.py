@@ -3,8 +3,6 @@
 # @author zhangshilong
 # @date 2024/7/7
 
-NA = "N/A"  # 载入csv时，会被pandas当成NaN处理
-
 
 class Enum:
     @classmethod

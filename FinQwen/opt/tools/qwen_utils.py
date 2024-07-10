@@ -9,11 +9,15 @@ get_stop_words_ids、make_context、decode_tokens都是直接从Qwen代码中拷
 使用时可以通过 from types import MethodType; model.batch = MethodType(batch, model) 添加为实例方法
 """
 
+from collections import Counter
 from typing import List
+from typing import Optional
 from typing import Tuple
 from typing import Union
 
 import torch
+from sklearn.feature_extraction import DictVectorizer
+from sklearn.metrics import pairwise_distances
 from transformers import PreTrainedModel
 from transformers import PreTrainedTokenizer
 
@@ -260,6 +264,10 @@ def batch(
     return batch_response
 
 
+# ==============================================================================
+# tokenizer部分
+
+
 # 解码词元列表时，并不合并成一个长字符串
 # 对应decode接口
 def decode_each(
@@ -296,3 +304,28 @@ def cut(
     token_ids = tokenizer(text)["input_ids"]
     decode_func = decode_each if isinstance(text, str) else batch_decode_each
     return decode_func(tokenizer, token_ids, skip_special_tokens, clean_up_tokenization_spaces, **kwargs)
+
+
+# 两组文本两两计算相似度
+def pairwise_scores(
+        tokenizer: PreTrainedTokenizer,
+        texts1: Union[str, List[str]],
+        texts2: Optional[Union[str, List[str]]],
+        metric: str = "jaccard"
+):
+    if isinstance(texts1, str):
+        texts1 = [texts1]
+    if texts2 is None:
+        texts2 = texts1
+    elif isinstance(texts2, str):
+        texts2 = [texts2]
+
+    # 合并后再fit_transform保证特征空间一致
+    texts = texts1 + texts2
+    batch_token_ids = tokenizer(texts)["input_ids"]
+    counters = [Counter(tokens) for tokens in batch_token_ids]
+    vectors = DictVectorizer(sparse=False).fit_transform(counters).astype(bool)
+
+    texts1_len = len(texts1)
+    vectors1, vectors2 = vectors[:texts1_len], vectors[texts1_len:]
+    return 1 - pairwise_distances(vectors1, vectors2, metric=metric)
