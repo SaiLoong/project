@@ -17,7 +17,7 @@ from typing import Union
 
 import torch
 from sklearn.feature_extraction import DictVectorizer
-from sklearn.metrics import pairwise_distances
+from sklearn.metrics import pairwise_distances as _pairwise_distances
 from transformers import PreTrainedModel
 from transformers import PreTrainedTokenizer
 
@@ -306,12 +306,12 @@ def cut(
     return decode_func(tokenizer, token_ids, skip_special_tokens, clean_up_tokenization_spaces, **kwargs)
 
 
-# 两组文本两两计算相似度
-def pairwise_scores(
+# 两组文本两两计算距离
+def pairwise_jaccard_distances(
         tokenizer: PreTrainedTokenizer,
         texts1: Union[str, List[str]],
-        texts2: Optional[Union[str, List[str]]],
-        metric: str = "jaccard"
+        texts2: Optional[Union[str, List[str]]] = None,
+        stop_words: Optional[List[str]] = None
 ):
     if isinstance(texts1, str):
         texts1 = [texts1]
@@ -323,9 +323,24 @@ def pairwise_scores(
     # 合并后再fit_transform保证特征空间一致
     texts = texts1 + texts2
     batch_token_ids = tokenizer(texts)["input_ids"]
+    if stop_words:
+        stop_word_token_ids = sum(tokenizer(stop_words)["input_ids"], list())
+        # 变成集合没关系，反正jaccard只取0/1
+        batch_token_ids = [set(token_ids).difference(stop_word_token_ids) for token_ids in batch_token_ids]
+
     counters = [Counter(tokens) for tokens in batch_token_ids]
     vectors = DictVectorizer(sparse=False).fit_transform(counters).astype(bool)
 
     texts1_len = len(texts1)
     vectors1, vectors2 = vectors[:texts1_len], vectors[texts1_len:]
-    return 1 - pairwise_distances(vectors1, vectors2, metric=metric)
+    return _pairwise_distances(vectors1, vectors2, metric="jaccard")
+
+
+# 两组文本两两计算相似度
+def pairwise_jaccard_scores(
+        tokenizer: PreTrainedTokenizer,
+        texts1: Union[str, List[str]],
+        texts2: Optional[Union[str, List[str]]] = None,
+        stop_words: Optional[List[str]] = None
+):
+    return 1 - pairwise_jaccard_distances(tokenizer, texts1, texts2, stop_words=stop_words)

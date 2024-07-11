@@ -11,28 +11,33 @@ from typing import Optional
 
 import pandas as pd
 import torch
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer
 from transformers import GenerationConfig
 from transformers import set_seed
 
+from constant import Category
 from constant import ModelMode
 from constant import ModelName
 from qwen_utils import batch
 from qwen_utils import batch_decode_each
 from qwen_utils import cut
 from qwen_utils import decode_each
-from qwen_utils import pairwise_scores
+from qwen_utils import pairwise_jaccard_distances
+from qwen_utils import pairwise_jaccard_scores
 from utils import File
 
 
 class ConfigMeta(type):
     def __init__(cls, name, bases, attr):
         super().__init__(name, bases, attr)
-        tqdm.pandas()  # DataFrame添加progress_apply方法
         pd.set_option("display.max_columns", None)
-        pd.set_option("display.max_colwidth", 500)  # 显示完整的文本
+        pd.set_option("display.max_colwidth", 500)  # 显示文本长些
+        plt.rcParams["font.sans-serif"] = ["SimHei"]  # 正确显示中文
+        plt.rcParams["axes.unicode_minus"] = False  # 正确显示负号“-”
+        tqdm.pandas()  # DataFrame添加progress_apply方法
 
         cls.set_seed()
         if platform.system() == "Linux":
@@ -42,6 +47,8 @@ class ConfigMeta(type):
 class Config(metaclass=ConfigMeta):
     SEED = 1024
     QUESTION_NUM = 1000
+    TEXT_QUESTION_NUM = 400
+    SQL_QUESTION_NUM = QUESTION_NUM - TEXT_QUESTION_NUM
     SAMPLE_QUESTION_NUM = 100
     COMPANY_NUM = 80
 
@@ -124,15 +131,7 @@ class Config(metaclass=ConfigMeta):
     def get_question_category_df(cls):
         question_category_df = pd.read_csv(cls.QUESTION_CATEGORY_PATH)
         assert len(question_category_df) == cls.QUESTION_NUM
-
-        # TODO FIX 临时用补丁修正分类
-        classification_bad_case = File.json_load(f"{cls.EXPERIMENT_OUTPUT_DIR}/classification_bad_case.json")
-        for category, bad_cases in classification_bad_case.items():
-            qids = [case["id"] for case in bad_cases]
-            condition = question_category_df["问题id"].isin(qids)
-            question_category_df.loc[condition, "分类"] = category
-            print(f"[FIX] 将{len(qids)}条问题的分类改为{category}: {qids}")
-
+        assert len(question_category_df.query(f"问题分类 == '{Category.TEXT}'")) == cls.TEXT_QUESTION_NUM
         return question_category_df
 
     @classmethod
@@ -150,7 +149,8 @@ class Config(metaclass=ConfigMeta):
         tokenizer.decode_each = MethodType(decode_each, tokenizer)
         tokenizer.batch_decode_each = MethodType(batch_decode_each, tokenizer)
         tokenizer.cut = MethodType(cut, tokenizer)
-        tokenizer.pairwise_scores = MethodType(pairwise_scores, tokenizer)
+        tokenizer.pairwise_jaccard_distances = MethodType(pairwise_jaccard_distances, tokenizer)
+        tokenizer.pairwise_jaccard_scores = MethodType(pairwise_jaccard_scores, tokenizer)
 
         return tokenizer
 
