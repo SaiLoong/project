@@ -49,7 +49,7 @@ class Config(metaclass=ConfigMeta):
     QUESTION_NUM = 1000
     TEXT_QUESTION_NUM = 400
     SQL_QUESTION_NUM = QUESTION_NUM - TEXT_QUESTION_NUM
-    SAMPLE_QUESTION_NUM = 100
+    SAMPLE_CLASSIFICATION_TEST_QUESTION_NUM = 100
     COMPANY_NUM = 80
 
     WORKSPACE_DIR = "/mnt/workspace"
@@ -71,8 +71,8 @@ class Config(metaclass=ConfigMeta):
     COMPANY_PATH = File.join(INTERMEDIATE_DIR, "A1_cid_to_company.csv")
     COMPANY_PDF_DIR = File.join(INTERMEDIATE_DIR, "pdf")
     COMPANY_TXT_DIR = File.join(INTERMEDIATE_DIR, "txt")
-    TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "test_question.csv")
-    QUESTION_CATEGORY_PATH = File.join(INTERMEDIATE_DIR, "A2_question_category.csv")
+    CLASSIFICATION_TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "classification_test_question.csv")
+    QUESTION_CLASSIFICATION_PATH = File.join(INTERMEDIATE_DIR, "A2_question_classification.csv")
 
     MODEL_NAME = ModelName.TONGYI_FINANCE_14B_CHAT_INT4
 
@@ -122,17 +122,17 @@ class Config(metaclass=ConfigMeta):
             return company_df
 
     @classmethod
-    def get_test_question_df(cls):
-        test_question_df = pd.read_csv(cls.TEST_QUESTION_PATH)
-        assert len(test_question_df) >= cls.SAMPLE_QUESTION_NUM
-        return test_question_df
+    def get_classification_test_question_df(cls):
+        classification_test_question_df = pd.read_csv(cls.CLASSIFICATION_TEST_QUESTION_PATH)
+        assert len(classification_test_question_df) >= cls.SAMPLE_CLASSIFICATION_TEST_QUESTION_NUM
+        return classification_test_question_df
 
     @classmethod
-    def get_question_category_df(cls):
-        question_category_df = pd.read_csv(cls.QUESTION_CATEGORY_PATH)
-        assert len(question_category_df) == cls.QUESTION_NUM
-        assert len(question_category_df.query(f"问题分类 == '{Category.TEXT}'")) == cls.TEXT_QUESTION_NUM
-        return question_category_df
+    def get_question_classification_df(cls):
+        question_classification_df = pd.read_csv(cls.QUESTION_CLASSIFICATION_PATH)
+        assert len(question_classification_df) == cls.QUESTION_NUM
+        assert len(question_classification_df.query(f"问题分类 == '{Category.TEXT}'")) == cls.TEXT_QUESTION_NUM
+        return question_classification_df
 
     @classmethod
     def get_tokenizer(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, **kwargs):

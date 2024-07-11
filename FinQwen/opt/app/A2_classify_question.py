@@ -25,9 +25,9 @@ similarity_matrix = tokenizer.pairwise_jaccard_scores(questions, companies)  # s
 max_similar_scores = similarity_matrix.max(axis=1)
 max_similar_indices = similarity_matrix.argmax(axis=1)
 max_similar_companies = [companies[index] for index in max_similar_indices]
-category_df = question_df.copy()
-category_df["最大相似分数"] = max_similar_scores
-category_df["最相似公司名称"] = max_similar_companies
+classification_df = question_df.copy()
+classification_df["最大相似分数"] = max_similar_scores
+classification_df["最相似公司名称"] = max_similar_companies
 
 # 要求问题与公司的相似度大于0.1 或 相似度>0.05且不含基金、股票、A股、港股等关键字才认为是Text
 cond1 = max_similar_scores > 0.1
@@ -36,22 +36,22 @@ cond2b = [re.search("基金|股票|A股|港股", question) is None for question 
 cond2 = np.logical_and(cond2a, cond2b)
 is_text = np.logical_or(cond1, cond2)
 
-category_df["问题分类"] = np.where(is_text, Category.TEXT, Category.SQL)
-category_df["公司名称"] = np.where(is_text, max_similar_companies, np.nan)
+classification_df["问题分类"] = np.where(is_text, Category.TEXT, Category.SQL)
+classification_df["公司名称"] = np.where(is_text, max_similar_companies, np.nan)
 # 上一步numpy将np.nan转为"nan"，修正它
-category_df.replace("nan", np.nan, inplace=True)
-category_df["公司id"] = category_df["公司名称"].map(company_to_cid_mapping)
+classification_df.replace("nan", np.nan, inplace=True)
+classification_df["公司id"] = classification_df["公司名称"].map(company_to_cid_mapping)
 
 # 查看分类比例
-category_counts = category_df["问题分类"].value_counts()
+category_counts = classification_df["问题分类"].value_counts()
 print(f"{category_counts=}")  # 600个SQL, 400个Text
 
 # 分数由低到高展示
-category_df.query(f"问题分类 == '{Category.TEXT}'").sort_values("最大相似分数")
+classification_df.query(f"问题分类 == '{Category.TEXT}'").sort_values("最大相似分数")
 
 # 分数由高到低展示
-category_df.query(f"问题分类 == '{Category.SQL}'").sort_values("最大相似分数", ascending=False)
+classification_df.query(f"问题分类 == '{Category.SQL}'").sort_values("最大相似分数", ascending=False)
 
 # 保存
-category_df.drop(columns=["最大相似分数", "最相似公司名称"], inplace=True)
-category_df.to_csv(Config.QUESTION_CATEGORY_PATH, index=False)
+classification_df.drop(columns=["最大相似分数", "最相似公司名称"], inplace=True)
+classification_df.to_csv(Config.QUESTION_CLASSIFICATION_PATH, index=False)

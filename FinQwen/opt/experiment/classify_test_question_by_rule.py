@@ -12,24 +12,24 @@ from ..tools.constant import Category
 
 tokenizer = Config.get_tokenizer()
 
-test_question_df = Config.get_test_question_df()
-company_df, companies = Config.get_company_df(return_companies=True)
-
+test_question_df = Config.get_classification_test_question_df()
 questions = test_question_df["问题"].tolist()
+
+company_df, companies = Config.get_company_df(return_companies=True)
 
 # 利用jaccard相似度给每个问题匹配最相似的公司
 similarity_matrix = tokenizer.pairwise_jaccard_scores(questions, companies)  # shape: 115*80
 max_similar_scores = similarity_matrix.max(axis=1)
 max_similar_indices = similarity_matrix.argmax(axis=1)
 max_similar_companies = [companies[index] for index in max_similar_indices]
-category_df = test_question_df.copy()
-category_df["最大相似分数"] = max_similar_scores
-category_df["最相似公司名称"] = max_similar_companies
+classification_df = test_question_df.copy()
+classification_df["最大相似分数"] = max_similar_scores
+classification_df["最相似公司名称"] = max_similar_companies
 
 # 分数由低到高展示
-category_df.query(f"问题标签 == '{Category.TEXT}'").sort_values("最大相似分数")
+classification_df.query(f"问题分类标签 == '{Category.TEXT}'").sort_values("最大相似分数")
 # 分数由高到低展示
-category_df.query(f"问题标签 == '{Category.SQL}'").sort_values("最大相似分数", ascending=False)
+classification_df.query(f"问题分类标签 == '{Category.SQL}'").sort_values("最大相似分数", ascending=False)
 
 # 要求问题与公司的相似度大于0.1 或 相似度>0.05且不含基金、股票、A股、港股等关键字才认为是Text
 cond1 = max_similar_scores > 0.1
@@ -38,34 +38,34 @@ cond2b = [re.search("基金|股票|A股|港股", question) is None for question 
 cond2 = np.logical_and(cond2a, cond2b)
 is_text = np.logical_or(cond1, cond2)
 
-category_df["问题分类"] = np.where(is_text, Category.TEXT, Category.SQL)
-category_df["公司名称识别"] = np.where(is_text, max_similar_companies, np.nan)
+classification_df["问题分类"] = np.where(is_text, Category.TEXT, Category.SQL)
+classification_df["公司名称"] = np.where(is_text, max_similar_companies, np.nan)
 # 上一步numpy将np.nan转为"nan"，修正它
-category_df.replace("nan", np.nan, inplace=True)
+classification_df.replace("nan", np.nan, inplace=True)
 
 # =========================================================
 
 
 # 展示分类效果
-category_df["分类正确"] = category_df["问题标签"] == category_df["问题分类"]
-question_num = len(category_df)
-correct_num = category_df["分类正确"].sum()
+classification_df["问题分类正确"] = classification_df["问题分类标签"] == classification_df["问题分类"]
+question_num = len(classification_df)
+correct_num = classification_df["问题分类正确"].sum()
 print(f"测试问题数： {question_num}")  # 115
-print(f"分类正确数：{correct_num}")
-print(f"分类正确率：{correct_num / question_num:.2%}")
+print(f"问题分类正确数：{correct_num}")
+print(f"问题分类正确率：{correct_num / question_num:.2%}")
 # 展示bad case
-category_df.query("分类正确 == False")
+classification_df.query("问题分类正确 == False")
 
 # 展示公司名称识别效果
-text_df = category_df.query(f"问题标签 == '{Category.TEXT}'").copy()
-text_df["公司名称识别正确"] = text_df["公司名称"] == text_df["公司名称识别"]
+text_df = classification_df.query(f"问题分类标签 == '{Category.TEXT}'").copy()
+text_df["公司名称正确"] = text_df["公司名称标签"] == text_df["公司名称"]
 text_num = len(text_df)
-company_correct_num = text_df["公司名称识别正确"].sum()
+company_correct_num = text_df["公司名称正确"].sum()
 print(f"测试Text问题数： {text_num}")
-print(f"公司名称识别正确数：{company_correct_num}")
-print(f"公司名称识别正确率：{company_correct_num / text_num:.2%}")
+print(f"公司名称正确数：{company_correct_num}")
+print(f"公司名称正确率：{company_correct_num / text_num:.2%}")
 # 展示bad case
-text_df.query("公司名称识别正确 == False")
+text_df.query("公司名称正确 == False")
 
 """
 结论：相似度>0.1 or (相似度>0.05 and 不含基金、股票、A股、港股)：115/115，55/55

@@ -7,7 +7,7 @@ import pandas as pd
 
 from ..tools.config import Config
 
-test_question_df = Config.get_test_question_df()
+test_question_df = Config.get_classification_test_question_df()
 
 ref_question_category_df = pd.read_csv(f"{Config.EXPERIMENT_REFERENCE_DIR}/A01_question_classify.csv")
 assert len(ref_question_category_df) == Config.QUESTION_NUM

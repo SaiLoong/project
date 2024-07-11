@@ -31,12 +31,9 @@ class ModelName(Enum):
     TONGYI_FINANCE_14B_CHAT_INT4 = "Tongyi-Finance-14B-Chat-Int4"
 
 
-class Label(Enum):
+class Category(Enum):
     TEXT = "Text"
     SQL = "SQL"
-
-
-Category = Label
 
 
 class ModelMode(Enum):

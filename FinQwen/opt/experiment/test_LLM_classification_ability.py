@@ -17,7 +17,7 @@ model_name = ModelName.QWEN_7B_CHAT
 tokenizer = Config.get_tokenizer(model_name)
 model = Config.get_model(model_name)
 
-test_question_df = Config.get_test_question_df()
+test_question_df = Config.get_classification_test_question_df()
 company_df, companies = Config.get_company_df(return_companies=True)
 tables = ["基金基本信息", "基金股票持仓明细", "基金债券持仓明细", "基金可转债持仓明细", "基金日行情表", "A股票日行情表",
           "港股票日行情表", "A股公司行业划分表", "基金规模变动表", "基金份额持有人结构"]

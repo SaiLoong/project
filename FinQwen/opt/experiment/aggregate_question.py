@@ -15,7 +15,7 @@ from ..tools.constant import Category
 
 tokenizer = Config.get_tokenizer()
 
-question_category_df = Config.get_question_category_df()
+question_category_df = Config.get_question_classification_df()
 question_df = question_category_df.query(f"问题分类 == '{Category.SQL}'").reset_index()[["问题id", "问题"]]  # 600条
 questions = question_df["问题"].tolist()
 
