@@ -46,13 +46,26 @@ season_to_start_end = {
 }
 seasons = list(season_to_start_end.keys())
 standards = ["中信", "申万"]
-compare_to_sign = {
-    "正": ">",
-    "负": "<",
+compare_to_sign_v1 = {
     "高": ">",
     "低": "<"
 }
-compares = list(compare_to_sign.keys())
+compares_v1 = list(compare_to_sign_v1.keys())
+compare_to_sign_v2 = {
+    "正": ">",
+    "负": "<"
+}
+compares_v2 = list(compare_to_sign_v2.keys())
+compare_to_sign_v3 = {
+    "大": ">",
+    "小": "<"
+}
+compares_v3 = list(compare_to_sign_v3.keys())
+compare_to_sign_v4 = {
+    "上升": ">",
+    "下跌": "<"
+}
+compares_v4 = list(compare_to_sign_v4.keys())
 stock_to_table = {
     "A股": "A股票日行情表",
     "港股": "港股票日行情表"
@@ -141,6 +154,8 @@ def gen():
     )
 
 
+gen()
+
 question = ""
 gen.query(question)
 
@@ -150,6 +165,8 @@ FROM
 WHERE
 AND
 AND
-LIMIT 1;
+LIMIT 100;
 """
 db.query(sql1)
+
+# TODO 聚类0、8题意模糊，不确定需不需要考虑绝对值，先不考虑，等钉钉群回复

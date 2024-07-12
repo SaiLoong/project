@@ -62,14 +62,14 @@ def gen1(year=None, monthday=None):
 def gen2(year=None, code=None, stock=None, compare=None):
     stock = stock or choice(stocks)
     table = stock_to_table[stock]
-    compare = compare or choice(compares)
+    compare = compare or choice(compares_v1)
     return dict(
         year=year or choice(years),
         code=code or random(table, "股票代码"),
         stock=stock,
         compare=compare,
         table=table,
-        sign=compare_to_sign[compare]
+        sign=compare_to_sign_v1[compare]
     )
 
 
@@ -240,7 +240,7 @@ def gen7a(date=None, industry1=None):
     """
 )
 def gen7b(date=None, compare=None, stock=None):
-    compare = compare or choice(compares)
+    compare = compare or choice(compares_v2)
     stock = stock or choice(stocks)
     table = stock_to_table[stock]
     return dict(
@@ -248,5 +248,79 @@ def gen7b(date=None, compare=None, stock=None):
         compare=compare,
         stock=stock,
         table=table,
-        sign=compare_to_sign[compare]
+        sign=compare_to_sign_v2[compare]
+    )
+
+
+@Decorator(
+    cluster_label=8,
+    question_template="请帮我计算，在{date}，{standard}行业分类划分的一级行业为{industry1}行业中，涨跌幅最大股票的股票代码是？涨跌幅是多少？百分数保留两位小数。股票涨跌幅定义为：（收盘价 - 前一日收盘价 / 前一日收盘价）* 100%。",
+    sql_template="""
+    SELECT 股票代码, ROUND(涨跌幅1 * 100, 2) || '%' AS 涨跌幅
+    FROM (
+        SELECT 股票代码, ([收盘价(元)] - [昨收盘(元)]) / [昨收盘(元)] AS 涨跌幅1
+        FROM A股票日行情表
+        WHERE 股票代码 IN (
+            SELECT 股票代码
+            FROM A股公司行业划分表
+            WHERE 交易日期 = '{date}'
+            AND 行业划分标准 = '{standard}行业分类'
+            AND 一级行业名称 = '{industry1}'
+        )
+        AND 交易日 = '{date}'
+        ORDER BY 涨跌幅1 DESC
+    )
+    LIMIT 1;
+    """
+)
+def gen8(date=None, standard=None, industry1=None):
+    table = "A股公司行业划分表"
+    return dict(
+        date=date or random(table, "交易日期"),
+        standard=standard or choice(standards),
+        industry1=industry1 or random(table, "一级行业名称")
+    )
+
+
+@Decorator(
+    cluster_label=9,
+    question_template="我想知道{company}在{year}年成立了多少只管理费率{compare}于{percent}%的基金？",
+    sql_template="""
+    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    FROM 基金基本信息
+    WHERE 管理人 = '{company}'
+    AND 成立日期 LIKE '{year}%'
+    AND 管理费率 {sign} '{percent}%'
+    LIMIT 1;
+    """
+)
+def gen9(company=None, year=None, compare=None, percent=None):
+    compare = compare or choice(compares_v3)
+    table = "基金基本信息"
+    return dict(
+        company=company or random(table, "管理人"),
+        year=year or choice(years),
+        compare=compare,
+        percent=percent or randint(1, 9) / 10,
+        sign=compare_to_sign_v3[compare]
+    )
+
+
+@Decorator(
+    cluster_label=10,
+    question_template="{date}港股{compare}的股票家数有多少家?",
+    sql_template="""
+    SELECT COUNT(DISTINCT(股票代码)) AS 数量
+    FROM 港股票日行情表
+    WHERE 交易日 = '{date}'
+    AND [收盘价(元)] {sign} [今开盘(元)]
+    LIMIT 1;
+    """
+)
+def gen10(date=None, compare=None):
+    compare = compare or choice(compares_v4)
+    return dict(
+        date=date or random("港股票日行情表", "交易日"),
+        compare=compare,
+        sign=compare_to_sign_v4[compare]
     )
