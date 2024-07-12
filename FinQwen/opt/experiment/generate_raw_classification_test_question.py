@@ -8,7 +8,7 @@ from ..tools.config import Config
 question_df = Config.get_question_df()
 
 # 虽然Config.set_seed()已经保证了第一次运行这句必然有相同的结果，但考虑到在notebook可能会多次运行，因此还是加上seed
-sample_df = question_df.sample(Config.SAMPLE_CLASSIFICATION_TEST_QUESTION_NUM, random_state=Config.SEED)
+sample_df = question_df.sample(Config.CLASSIFICATION_TEST_QUESTION_SAMPLE_NUM, random_state=Config.SEED)
 sample_df.sort_index(inplace=True)
 sample_df["问题分类标签"] = ""
 sample_df["公司名称标签"] = None

@@ -6,8 +6,12 @@
 import json
 import os
 import shutil
+import sqlite3
 from typing import Any
 from typing import List
+from typing import Optional
+
+import pandas as pd
 
 
 class File:
@@ -120,11 +124,20 @@ class File:
             raise TypeError(f"{src=} is neither file nor directory")
 
     @classmethod
-    def json_dump(cls, obj: Any, path: str, *args, **kwargs) -> None:
+    def json_dump(cls, obj: Any, path: str, ensure_ascii: bool = False, indent: Optional[int] = 4, *args,
+                  **kwargs) -> None:
         with open(path, "w") as file:
-            json.dump(obj, file, *args, **kwargs)
+            json.dump(obj, file, ensure_ascii=ensure_ascii, indent=indent, *args, **kwargs)
 
     @classmethod
     def json_load(cls, path: str, *args, **kwargs) -> Any:
         with open(path, "r") as file:
             return json.load(file, *args, **kwargs)
+
+
+class Database:
+    def __init__(self, database: str):
+        self.connection = sqlite3.connect(database)
+
+    def query(self, sql: str, *args, **kwargs) -> pd.DataFrame:
+        return pd.read_sql(sql, self.connection, *args, **kwargs)

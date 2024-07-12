@@ -3,7 +3,6 @@
 # @author zhangshilong
 # @date 2024/7/7
 
-
 class Enum:
     @classmethod
     def items(cls):
@@ -39,3 +38,10 @@ class Category(Enum):
 class ModelMode(Enum):
     TRAIN = "train"
     EVAL = "eval"
+
+
+class ColumnType(Enum):
+    TEXT = "TEXT"
+    REAL = "REAL"
+    INTEGER = "INTEGER"
+    TIMESTAMP = "TIMESTAMP"

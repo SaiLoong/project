@@ -27,6 +27,7 @@ from qwen_utils import cut
 from qwen_utils import decode_each
 from qwen_utils import pairwise_jaccard_distances
 from qwen_utils import pairwise_jaccard_scores
+from utils import Database
 from utils import File
 
 
@@ -46,11 +47,14 @@ class ConfigMeta(type):
 
 class Config(metaclass=ConfigMeta):
     SEED = 1024
+    COMPANY_NUM = 80
     QUESTION_NUM = 1000
     TEXT_QUESTION_NUM = 400
     SQL_QUESTION_NUM = QUESTION_NUM - TEXT_QUESTION_NUM
-    SAMPLE_CLASSIFICATION_TEST_QUESTION_NUM = 100
-    COMPANY_NUM = 80
+
+    CLASSIFICATION_TEST_QUESTION_SAMPLE_NUM = 100
+    DATABASE_RECORD_SAMPLE_NUM = 1000
+    COLUMN_DISTINCT_VALUE_SAMPLE_NUM = 20
 
     WORKSPACE_DIR = "/mnt/workspace"
 
@@ -124,7 +128,7 @@ class Config(metaclass=ConfigMeta):
     @classmethod
     def get_classification_test_question_df(cls):
         classification_test_question_df = pd.read_csv(cls.CLASSIFICATION_TEST_QUESTION_PATH)
-        assert len(classification_test_question_df) >= cls.SAMPLE_CLASSIFICATION_TEST_QUESTION_NUM
+        assert len(classification_test_question_df) >= cls.CLASSIFICATION_TEST_QUESTION_SAMPLE_NUM
         return classification_test_question_df
 
     @classmethod
@@ -212,6 +216,10 @@ class Config(metaclass=ConfigMeta):
         generation_config = GenerationConfig.from_pretrained(
             model_dir, trust_remote_code=True, do_sample=do_sample, **kwargs)
         return generation_config
+
+    @classmethod
+    def get_database(cls):
+        return Database(cls.DATABASE_PATH)
 
     @classmethod
     def set_seed(cls, seed: Optional[int] = None) -> None:

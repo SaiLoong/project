@@ -12,7 +12,7 @@ from ..tools.utils import File
 
 # 载入标好的数据
 test_question_df = pd.read_json(f"{Config.EXPERIMENT_OUTPUT_DIR}/classification_test_question.json")
-assert len(test_question_df) == Config.SAMPLE_CLASSIFICATION_TEST_QUESTION_NUM
+assert len(test_question_df) == Config.CLASSIFICATION_TEST_QUESTION_SAMPLE_NUM
 # 将None转化为np.nan，方便后续处理
 test_question_df.fillna(np.nan, inplace=True)
 
