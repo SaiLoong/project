@@ -32,7 +32,7 @@ classification_df["最相似公司名称"] = max_similar_companies
 # 要求问题与公司的相似度大于0.1 或 相似度>0.05且不含基金、股票、A股、港股等关键字才认为是Text
 cond1 = max_similar_scores > 0.1
 cond2a = max_similar_scores > 0.05
-cond2b = [re.search("基金|股票|A股|港股", question) is None for question in questions]
+cond2b = [not re.search("基金|股票|A股|港股", question) for question in questions]
 cond2 = np.logical_and(cond2a, cond2b)
 is_text = np.logical_or(cond1, cond2)
 

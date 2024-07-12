@@ -137,9 +137,10 @@ class File:
 
 
 class String:
-    # 注意：template的参数不能紧挨着
     @classmethod
     def backstep_format_params(cls, template, string):
+        assert not re.search("}{", template)  # template的参数不能紧挨着
+
         keys = [m.group(1) for m in re.finditer(r"{(\w*)}", template)]
 
         values = list()

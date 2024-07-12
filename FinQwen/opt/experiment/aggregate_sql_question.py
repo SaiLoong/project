@@ -51,9 +51,9 @@ best_labels = labels_list[best_idx]
 question_df["问题聚类"] = best_labels
 cluster_questions = {label: df["问题"].tolist() for label, df in question_df.groupby("问题聚类")}
 
-for label, questions in cluster_questions.items():
+for label, _questions in cluster_questions.items():
     print(f"聚类：{label}")
-    for question in questions:
+    for question in _questions:
         print(f"\t{question}")
     print()
 

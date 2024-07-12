@@ -3,6 +3,7 @@
 # @author zhangshilong
 # @date 2024/7/12
 
+from collections import defaultdict
 from dataclasses import dataclass
 from random import choice
 from random import randint
@@ -12,6 +13,7 @@ import pandas as pd
 
 from ..tools.config import Config
 from ..tools.utils import File
+from ..tools.utils import String
 
 db = Config.get_database()
 
@@ -22,6 +24,10 @@ column_dfs = {table: pd.DataFrame(v["字段信息"]) for table, v in db_metadata
 
 def get_distinct_values(table, column):
     return column_dfs[table].query(f"字段名 == '{column}'")["唯一值抽样"].iloc[0]
+
+
+def random(table, column):
+    return choice(get_distinct_values(table, column))
 
 
 years = [2019, 2020, 2021]
@@ -40,19 +46,16 @@ season_to_start_end = {
     "Q4": ("1001", "1231")
 }
 seasons = list(season_to_start_end.keys())
-
-A股票日行情表_股票代码s = get_distinct_values("A股票日行情表", "股票代码")
-
-基金份额持有人结构_报告类型s = get_distinct_values("基金份额持有人结构", "报告类型")
-
-基金可转债持仓明细_基金代码s = get_distinct_values("基金可转债持仓明细", "基金代码")
-
+standards = ["中信", "申万"]
 
 # 上面是全局环境
 # =====================================================================================================
 # 统一规范：
 # 1. 为了防止有冗余数据（同时也不想逐条检查），所有COUNT都加上DISTINCT
 # 2. 所有sql均以'LIMIT XX;'结尾，哪怕只有一条数据也要加
+
+# TODO 变成Generator或Decorator的类属性？
+generators = defaultdict(list)
 
 
 @dataclass
@@ -72,17 +75,33 @@ class Generator:
         result = db.query(sql).to_dict(orient="records")
         return question, sql, result
 
+    def parse(self, question):
+        params = String.backstep_format_params(self.question_template, question)
+        assert self.question_template.format(**params) == question
+        return params
+
+    def query(self, question):
+        params = self.parse(question)
+        return self(**params)
+
 
 @dataclass
 class Decorator:
+    cluster_label: int
     question_template: str
     sql_template: str
 
     def __call__(self, func: Callable):
-        return Generator(self.question_template, self.sql_template, func)
+        generator = Generator(self.question_template, self.sql_template, func)
+        generators[self.cluster_label].append(generator)
+        return generator
+
+
+# =====================================================================================================
 
 
 @Decorator(
+    cluster_label=0,
     question_template="请帮我查询下，在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是什么？差额有多少？保留两位小数。",
     sql_template="""
     SELECT 基金简称, ROUND(报告期基金总申购份额 - 报告期基金总赎回份额, 2) AS 差额
@@ -100,6 +119,7 @@ def gen0(year=None, month=None):
 
 
 @Decorator(
+    cluster_label=1,
     question_template="请帮我查询在截止{year}-{monthday}的基金定期报告中，基金总赎回份额为零的基金有几个？",
     sql_template="""
     SELECT COUNT(DISTINCT(基金代码)) AS 数量
@@ -118,6 +138,7 @@ def gen1(year=None, monthday=None):
 
 
 @Decorator(
+    cluster_label=2,
     question_template="帮我查一下在{year}年，代码为{code}的A股股票今开盘高于昨收盘的天数？",
     sql_template="""
     SELECT COUNT(DISTINCT(交易日)) AS 天数
@@ -131,11 +152,12 @@ def gen1(year=None, monthday=None):
 def gen2(year=None, code=None):
     return dict(
         year=year or choice(years),
-        code=code or choice(A股票日行情表_股票代码s)
+        code=code or random("A股票日行情表", "股票代码")
     )
 
 
 @Decorator(
+    cluster_label=3,
     question_template="针对{year}年的{report}，有多少家基金的个人投资者持有份额占比不足{percent}%?",
     sql_template="""
     SELECT COUNT(DISTINCT(基金代码)) AS 数量
@@ -149,12 +171,13 @@ def gen2(year=None, code=None):
 def gen3a(year=None, report=None, percent=None):
     return dict(
         year=year or choice(years),
-        report=report or choice(基金份额持有人结构_报告类型s),
+        report=report or random("基金份额持有人结构", "报告类型"),
         percent=percent or randint(1, 100)
     )
 
 
 @Decorator(
+    cluster_label=3,
     question_template="请帮我查询下，在{year}年{season}季报报告中，{code}基金的第一大重仓可转债同期还有多少只基金也进行了持仓？",
     sql_template="""
     With t1 AS (
@@ -185,7 +208,36 @@ def gen3b(year=None, season=None, code=None):
         season=season,
         start=start,
         end=end,
-        code=code or choice(基金可转债持仓明细_基金代码s)
+        code=code or random("基金可转债持仓明细", "基金代码")
+    )
+
+
+@Decorator(
+    cluster_label=4,
+    question_template="我想知道{name}基金在{date}的{report}中，其可转债持仓占比最大的是哪个行业？用{standard}一级行业来统计。",
+    sql_template="""
+    SELECT 一级行业名称
+    FROM A股公司行业划分表
+    WHERE 股票代码 IN (
+        SELECT 对应股票代码
+        FROM 基金可转债持仓明细
+        WHERE 基金简称 = '{name}'
+        AND 持仓日期 = '{date}'
+        AND 报告类型 = '{report}'
+        ORDER BY 第N大重仓股 ASC
+        LIMIT 1
+    )
+    AND 行业划分标准 LIKE '{standard}%'
+    AND 交易日期 = '{date}'
+    LIMIT 1;
+    """
+)
+def gen4(name=None, date=None, report=None, standard=None):
+    return dict(
+        name=name or random("基金可转债持仓明细", "基金简称"),
+        date=date or random("基金可转债持仓明细", "持仓日期"),
+        report=report or random("基金可转债持仓明细", "报告类型"),
+        standard=standard or choice(standards)
     )
 
 
@@ -193,6 +245,7 @@ def gen3b(year=None, season=None, code=None):
 # 模板
 
 @Decorator(
+    cluster_label=NotImplemented,
     question_template="",
     sql_template="""
     SELECT
