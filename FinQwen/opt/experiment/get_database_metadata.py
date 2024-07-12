@@ -3,12 +3,10 @@
 # @author zhangshilong
 # @date 2024/7/12
 
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 from ..tools.config import Config
-from ..tools.constant import ColumnType
 from ..tools.utils import File
 
 db = Config.get_database()
@@ -30,32 +28,30 @@ for table in tqdm(tables):
 
 # 收集每个表每个字段的唯一值信息
 db_metadata = dict()
-for table in tqdm(tables):  # 约19s
+for table in tqdm(tables):  # 2min
     def func(row):
         column = row["字段名"]
-        column_type = row["字段类型"]
-        if column_type == ColumnType.TEXT:
-            # 字段名中可能含有括号，因此用[]包起来（单引号、双引号其实也可以）
-            distinct_num = db.query(f"SELECT COUNT(DISTINCT([{column}])) FROM {table};").iloc[0, 0]
-            distinct_values = db.query(
-                f"SELECT DISTINCT([{column}]) FROM {table} LIMIT {Config.COLUMN_DISTINCT_VALUE_SAMPLE_NUM};"
-            )[column].tolist()
-        else:
-            distinct_num = None
-            distinct_values = None
+
+        # 字段名中可能含有括号，因此用[]包起来（单引号、双引号其实也可以）
+        distinct_num = db.query(f"SELECT COUNT(DISTINCT([{column}])) FROM {table};").iloc[0, 0]
+        # 不随机的话，股票/基金代码等字段的值很小
+        distinct_values = db.query(
+            f"SELECT DISTINCT([{column}]) FROM {table} ORDER BY RANDOM() LIMIT {Config.COLUMN_DISTINCT_VALUE_SAMPLE_NUM};"
+        )[column].tolist()
+
         return pd.Series({"唯一值数量": distinct_num, "唯一值抽样": distinct_values})
 
 
     df1 = db.query(f"PRAGMA table_info({table});")  # 获取表有哪些字段
     df2 = pd.DataFrame({"字段名": df1["name"], "字段类型": df1["type"]})
-    df3 = pd.concat([df2, df2.apply(func, axis=1)], axis=1)
-    df3.replace(np.nan, None, inplace=True)  # np.nan在json dump时直接生成NaN，不合法，因此转为None
+    column_df = pd.concat([df2, df2.apply(func, axis=1)], axis=1)
+    # column_df.replace(np.nan, None, inplace=True)  # np.nan在json dump时直接生成NaN，不合法，因此转为None
 
     db_metadata[table] = {
         # 原本是np.int64，json dump会失败
         "记录数量": int(db.query(f"SELECT COUNT(*) FROM {table};").iloc[0, 0]),
-        "字段信息": df3.to_dict(orient="records")
+        "字段信息": column_df.to_dict(orient="records")
     }
 
 # 保存db_metadata
-File.json_dump(db_metadata, f"{Config.EXPERIMENT_OUTPUT_DIR}/database_metadata.json")
+File.json_dump(db_metadata, Config.DATABASE_METADATA_PATH)

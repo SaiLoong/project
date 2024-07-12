@@ -54,7 +54,7 @@ class Config(metaclass=ConfigMeta):
 
     CLASSIFICATION_TEST_QUESTION_SAMPLE_NUM = 100
     DATABASE_RECORD_SAMPLE_NUM = 1000
-    COLUMN_DISTINCT_VALUE_SAMPLE_NUM = 20
+    COLUMN_DISTINCT_VALUE_SAMPLE_NUM = 100
 
     WORKSPACE_DIR = "/mnt/workspace"
 
@@ -77,6 +77,7 @@ class Config(metaclass=ConfigMeta):
     COMPANY_TXT_DIR = File.join(INTERMEDIATE_DIR, "txt")
     CLASSIFICATION_TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "classification_test_question.csv")
     QUESTION_CLASSIFICATION_PATH = File.join(INTERMEDIATE_DIR, "A2_question_classification.csv")
+    DATABASE_METADATA_PATH = File.join(INTERMEDIATE_DIR, "database_metadata.json")
 
     MODEL_NAME = ModelName.TONGYI_FINANCE_14B_CHAT_INT4
 
