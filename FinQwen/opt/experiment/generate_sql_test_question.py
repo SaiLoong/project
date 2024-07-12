@@ -46,6 +46,31 @@ season_to_start_end = {
 }
 seasons = list(season_to_start_end.keys())
 standards = ["中信", "申万"]
+compare_to_sign = {
+    "正": ">",
+    "负": "<",
+    "高": ">",
+    "低": "<"
+}
+compares = list(compare_to_sign.keys())
+stock_to_table = {
+    "A股": "A股票日行情表",
+    "港股": "港股票日行情表"
+}
+stocks = list(stock_to_table.keys())
+units = ["个人", "机构"]
+numzh_to_num = {
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9
+}
+numzhs = list(numzh_to_num.keys())
 
 # 上面是全局环境
 # =====================================================================================================
@@ -103,20 +128,28 @@ class Decorator:
 # =====================================================================================================
 # 模板
 
+
 @Decorator(
     cluster_label=NotImplemented,
     question_template="",
-    sql_template="""
-    SELECT
-    FROM
-    WHERE
-    AND
-    AND
-    LIMIT 1;
-    """
+    sql_template=""
 )
-def gen(year=None, monthday=None):
+def gen():
+    table = ""
     return dict(
-        year=year or choice(years),
-        monthday=monthday or choice(monthdays)
+
     )
+
+
+question = ""
+gen.query(question)
+
+sql1 = """
+SELECT
+FROM
+WHERE
+AND
+AND
+LIMIT 1;
+"""
+db.query(sql1)
