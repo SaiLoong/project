@@ -5,6 +5,7 @@
 
 import json
 import os
+import re
 import shutil
 import sqlite3
 from typing import Any
@@ -133,6 +134,27 @@ class File:
     def json_load(cls, path: str, *args, **kwargs) -> Any:
         with open(path, "r") as file:
             return json.load(file, *args, **kwargs)
+
+
+class String:
+    # 注意：template的参数不能紧挨着
+    @classmethod
+    def backstep_format_params(cls, template, string):
+        keys = [m.group(1) for m in re.finditer(r"{(\w*)}", template)]
+
+        values = list()
+        for split in re.split(r"{\w*}", template):
+            if not split:  # 关键字在开头或结尾时，会产生""
+                continue
+
+            value, string = string.split(split, 1)
+            if value:
+                values.append(value)
+
+        if string:  # 关键字在结尾
+            values.append(string)
+
+        return dict(zip(keys, values))
 
 
 class Database:
