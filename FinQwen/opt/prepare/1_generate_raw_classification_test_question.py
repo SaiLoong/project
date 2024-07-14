@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file generate_raw_classification_test_question.py
+# @file 1_generate_raw_classification_test_question.py
 # @author zhangshilong
 # @date 2024/7/12
 
@@ -14,7 +14,7 @@ sample_df["问题分类标签"] = ""
 sample_df["公司名称标签"] = None
 
 # 导出成json格式，方便填上标签
-sample_df.to_json(f"{Config.EXPERIMENT_OUTPUT_DIR}/raw_classification_test_question.json", orient="records",
+sample_df.to_json(f"{Config.PREPARE_OUTPUT_DIR}/raw_classification_test_question.json", orient="records",
                   force_ascii=False, indent=4)
 
-# 人工填上标签后另存为classification_test_question.json, 放回experiment/output文件夹
+# 人工填上标签后另存为classification_test_question.json, 放回prepare/output文件夹

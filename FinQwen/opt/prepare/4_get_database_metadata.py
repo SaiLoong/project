@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file get_database_metadata.py
+# @file 4_get_database_metadata.py
 # @author zhangshilong
 # @date 2024/7/12
 
@@ -19,7 +19,7 @@ tables = db.query("SELECT name FROM sqlite_master WHERE type='table';")["name"].
 """
 
 # 每个表抽样1000条保存
-sample_database_dir = f"{Config.EXPERIMENT_OUTPUT_DIR}/sample_database"
+sample_database_dir = f"{Config.PREPARE_OUTPUT_DIR}/sample_database"
 File.makedirs(sample_database_dir)
 for table in tqdm(tables):
     # 貌似结果是固定的

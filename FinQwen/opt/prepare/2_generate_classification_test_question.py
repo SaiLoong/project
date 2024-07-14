@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file generate_classification_test_question.py
+# @file 2_generate_classification_test_question.py
 # @author zhangshilong
 # @date 2024/7/12
 
@@ -11,7 +11,7 @@ from ..tools.constant import Category
 from ..tools.utils import File
 
 # 载入标好的数据
-test_question_df = pd.read_json(f"{Config.EXPERIMENT_OUTPUT_DIR}/classification_test_question.json")
+test_question_df = pd.read_json(f"{Config.PREPARE_OUTPUT_DIR}/classification_test_question.json")
 assert len(test_question_df) == Config.CLASSIFICATION_TEST_QUESTION_SAMPLE_NUM
 # 将None转化为np.nan，方便后续处理
 test_question_df.fillna(np.nan, inplace=True)
@@ -54,7 +54,7 @@ for category, df in test_question_df.groupby("问题分类标签"):
 
 
 # 载入后续调试过程中发现的bad case
-classification_bad_case = File.json_load(f"{Config.EXPERIMENT_OUTPUT_DIR}/classification_bad_case.json")
+classification_bad_case = File.json_load(f"{Config.PREPARE_OUTPUT_DIR}/classification_bad_case.json")
 
 # 合并到test_question_df
 for category, bad_cases in classification_bad_case.items():

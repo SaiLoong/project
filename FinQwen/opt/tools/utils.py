@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import sqlite3
+from functools import cache
 from typing import Any
 from typing import List
 from typing import Optional
@@ -158,6 +159,7 @@ class String:
         return dict(zip(keys, values))
 
 
+@cache
 class Database:
     def __init__(self, database: str):
         self.connection = sqlite3.connect(database)

@@ -71,12 +71,16 @@ class Config(metaclass=ConfigMeta):
     EXPERIMENT_OUTPUT_DIR = File.join(EXPERIMENT_DIR, "output")
     EXPERIMENT_REFERENCE_DIR = File.join(EXPERIMENT_DIR, "reference")
 
+    PREPARE_DIR = File.join(WORKSPACE_DIR, "prepare")
+    PREPARE_OUTPUT_DIR = File.join(PREPARE_DIR, "output")
+
     INTERMEDIATE_DIR = File.join(WORKSPACE_DIR, "intermediate")
     COMPANY_PATH = File.join(INTERMEDIATE_DIR, "A1_cid_to_company.csv")
     COMPANY_PDF_DIR = File.join(INTERMEDIATE_DIR, "pdf")
     COMPANY_TXT_DIR = File.join(INTERMEDIATE_DIR, "txt")
     CLASSIFICATION_TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "classification_test_question.csv")
     QUESTION_CLASSIFICATION_PATH = File.join(INTERMEDIATE_DIR, "A2_question_classification.csv")
+    SQL_QUESTION_AGGREGATION_PATH = File.join(INTERMEDIATE_DIR, "sql_question_aggregation.csv")
     DATABASE_METADATA_PATH = File.join(INTERMEDIATE_DIR, "database_metadata.json")
 
     MODEL_NAME = ModelName.TONGYI_FINANCE_14B_CHAT_INT4

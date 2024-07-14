@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file aggregate_sql_question.py
+# @file 3_aggregate_sql_question.py
 # @author zhangshilong
 # @date 2024/7/8
 
@@ -57,8 +57,9 @@ for label, _questions in cluster_questions.items():
         print(f"\t{question}")
     print()
 
-# 保存
-File.json_dump(cluster_questions, f"{Config.EXPERIMENT_OUTPUT_DIR}/sql_question_aggregation.json")
+# 保存，json形式方便人工查看，csv形式保留更多信息
+File.json_dump(cluster_questions, f"{Config.PREPARE_OUTPUT_DIR}/sql_question_aggregation.json")
+question_df.to_csv(Config.SQL_QUESTION_AGGREGATION_PATH, index=False)
 
 """
 结论：簇数为57时轮廓系数最大，0.6411

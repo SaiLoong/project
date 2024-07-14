@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file generate_sql_test_question.py
+# @file 5_generate_sql_test_question.py
 # @author zhangshilong
 # @date 2024/7/12
 
@@ -59,13 +59,14 @@ class Generator:
 
     def __post_init__(self):
         self.sql_template = self.sql_template.replace("\n    ", "\n").strip()
+        self.db = Config.get_database()
 
     def __call__(self, **params):
         params = self.preproccess_params(**params)
 
         question = self.question_template.format(**params)
         sql = self.sql_template.format(**params)
-        result = db.query(sql).to_dict(orient="records")
+        result = self.db.query(sql).to_dict(orient="records")
         return question, sql, result
 
     def parse(self, question):
