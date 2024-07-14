@@ -5,13 +5,40 @@
 
 # TODO 临时存放处理好的Generator
 
+from random import choice
 from random import randint
 
-from generate_sql_test_question import *
+from sql_utils import Manager
+from ..tools.config import Config
+
+db_metadata = Config.get_database_metadata()
+distinct_values_dct = {
+    table: {
+        record["字段名"]: record["唯一值抽样"]
+        for record in v["字段信息"]
+    }
+    for table, v in db_metadata.items()
+}
 
 
-@Decorator(
-    cluster_label=0,
+def choice_from_column(table, column):
+    return choice(distinct_values_dct[table][column])
+
+
+def choice_from_dict(dct):
+    return choice(list(dct.keys()))
+
+
+years = [2019, 2020, 2021]
+standards = ["中信", "申万"]
+stock_to_table = {
+    "A股": "A股票日行情表",
+    "港股": "港股票日行情表"
+}
+
+
+@Manager(
+    cluster=0,
     question_template="请帮我查询下，在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是什么？差额有多少？保留两位小数。",
     sql_template="""
     SELECT 基金简称, ROUND(报告期基金总申购份额 - 报告期基金总赎回份额, 2) AS 差额
@@ -30,8 +57,8 @@ def gen0(year=None, month=None):
     )
 
 
-@Decorator(
-    cluster_label=1,
+@Manager(
+    cluster=1,
     question_template="请帮我查询在截止{year}-{monthday}的基金定期报告中，基金总赎回份额为零的基金有几个？",
     sql_template="""
     SELECT COUNT(DISTINCT(基金代码)) AS 数量
@@ -51,8 +78,8 @@ def gen1(year=None, monthday=None):
     )
 
 
-@Decorator(
-    cluster_label=2,
+@Manager(
+    cluster=2,
     question_template="帮我查一下在{year}年，代码为{code}的{stock}股票今开盘{compare}昨收盘的天数？",
     sql_template="""
     SELECT COUNT(DISTINCT(交易日)) AS 天数
@@ -83,8 +110,8 @@ def gen2(year=None, code=None, stock=None, compare=None):
     )
 
 
-@Decorator(
-    cluster_label=3,
+@Manager(
+    cluster=3,
     question_template="针对{year}年的{report}，有多少家基金的{role}持有份额占比不足{percent}%?",
     sql_template="""
     SELECT COUNT(DISTINCT(基金代码)) AS 数量
@@ -107,8 +134,8 @@ def gen3a(year=None, report=None, role=None, percent=None):
     )
 
 
-@Decorator(
-    cluster_label=3,
+@Manager(
+    cluster=3,
     question_template="请帮我查询下，在{year}年{season}季报报告中，{code}基金的第{numzh}大重仓可转债同期还有多少只基金也进行了持仓？",
     # 问题是问“还有”，因此要扣除自己
     sql_template="""
@@ -165,8 +192,8 @@ def gen3b(year=None, season=None, code=None, numzh=None):
     )
 
 
-@Decorator(
-    cluster_label=4,
+@Manager(
+    cluster=4,
     question_template="我想知道{name}基金在{date}的{report}中，其可转债持仓占比最大的是哪个行业？用{standard}一级行业来统计。",
     sql_template="""
     SELECT 一级行业名称
@@ -196,8 +223,8 @@ def gen4(name=None, date=None, report=None, standard=None):
     )
 
 
-@Decorator(
-    cluster_label=5,
+@Manager(
+    cluster=5,
     question_template="在{date}的{report}中，{name}基金的债券持仓,其持有最大仓位的债券类型是什么?",
     sql_template="""
     SELECT 债券类型
@@ -219,8 +246,8 @@ def gen5(date=None, report=None, name=None):
     )
 
 
-@Decorator(
-    cluster_label=6,
+@Manager(
+    cluster=6,
     question_template="{manager}管理的{category}产品的数量有多少?",
     sql_template="""
     SELECT COUNT(DISTINCT(基金代码)) AS 数量
@@ -239,8 +266,8 @@ def gen6(manager=None, category=None):
     )
 
 
-@Decorator(
-    cluster_label=7,
+@Manager(
+    cluster=7,
     question_template="{date}日，一级行业为{industry1}的股票的{target}合计是多少？取整。",
     # 问题没有明确是中信还是申万标准，有的一级行业只有一边有，有的两边都有，不过不影响结果
     sql_template="""
@@ -272,8 +299,8 @@ def gen7a(date=None, industry1=None, target=None):
     )
 
 
-@Decorator(
-    cluster_label=7,
+@Manager(
+    cluster=7,
     question_template="请帮我计算：在{date}，日收益率为{compare}的{stock}股票有几个。",
     sql_template="""
     SELECT COUNT(DISTINCT(股票代码)) AS 数量
@@ -302,8 +329,8 @@ def gen7b(date=None, compare=None, stock=None):
     )
 
 
-@Decorator(
-    cluster_label=8,
+@Manager(
+    cluster=8,
     question_template="请帮我计算，在{date}，{standard}行业分类划分的一级行业为{industry1}行业中，涨跌幅最大股票的股票代码是？涨跌幅是多少？百分数保留两位小数。股票涨跌幅定义为：（收盘价 - 前一日收盘价 / 前一日收盘价）* 100%。",
     sql_template="""
     SELECT 股票代码, ROUND(涨跌幅0 * 100, 2) || '%' AS 涨跌幅
@@ -333,8 +360,8 @@ def gen8(date=None, standard=None, industry1=None):
     )
 
 
-@Decorator(
-    cluster_label=9,
+@Manager(
+    cluster=9,
     question_template="我想知道{company}在{year}年成立了多少只管理费率{compare}于{percent}%的基金？",
     sql_template="""
     SELECT COUNT(DISTINCT(基金代码)) AS 数量
@@ -362,8 +389,8 @@ def gen9(company=None, year=None, compare=None, percent=None):
     )
 
 
-@Decorator(
-    cluster_label=10,
+@Manager(
+    cluster=10,
     question_template="{date}港股{compare}的股票家数有多少家?",
     sql_template="""
     SELECT COUNT(DISTINCT(股票代码)) AS 数量
@@ -388,8 +415,8 @@ def gen10(date=None, compare=None):
     )
 
 
-@Decorator(
-    cluster_label=11,
+@Manager(
+    cluster=11,
     question_template="我想了解{name}基金,在{year}年{season}的季报第{rank}大重股。该持仓股票当个季度的涨跌幅?请四舍五入保留百分比到小数点两位。",
     # 先把股票找出来，存到t1表中（只有一条数据），股票可能在A股表也可能在港股表，SQL貌似不支持动态选择表的操作，因此只能分别查询A股和港股表，
     # 然后将答案union起来得到t4表（有且只有1个表有数据）。t4表包含目标股票在目标季度内的所有数据，分别找到最早的昨收价和最晚的收盘价（不一定在季度第一天和最后一天），
@@ -453,8 +480,8 @@ def gen11(name=None, year=None, season=None, rank=None):
     )
 
 
-@Decorator(
-    cluster_label=12,
+@Manager(
+    cluster=12,
     question_template="我想知道{name}基金，在{year}年{report}中，前{rank}大重仓股中，有多少只股票在报告期内取得{compare}收益。",
     # 问题11的加强版，从计算一个股票改为计算多个股票
     # t5、t6还可以用 RANK() OVER (PARTITION BY 股票代码 ORDER BY 交易日 ASC) 的方式排序然后选择第1个，更通用

@@ -144,6 +144,16 @@ class Config(metaclass=ConfigMeta):
         return question_classification_df
 
     @classmethod
+    def get_sql_question_aggregation_df(cls):
+        sql_question_aggregation_df = pd.read_csv(cls.SQL_QUESTION_AGGREGATION_PATH)
+        assert len(sql_question_aggregation_df) == cls.SQL_QUESTION_NUM
+        return sql_question_aggregation_df
+
+    @classmethod
+    def get_database_metadata(cls):
+        return File.json_load(cls.DATABASE_METADATA_PATH)
+
+    @classmethod
     def get_tokenizer(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, **kwargs):
         assert mode in ModelMode.values()
         # batch推理需要左padding，chat则不受影响。而训练需要右padding

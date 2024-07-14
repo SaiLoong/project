@@ -8,12 +8,18 @@ import os
 import re
 import shutil
 import sqlite3
-from functools import cache
+from concurrent.futures import ProcessPoolExecutor
+from time import time
+from types import TracebackType
 from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Type
 
+import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 
 class File:
@@ -137,9 +143,65 @@ class File:
             return json.load(file, *args, **kwargs)
 
 
+class Timer:
+    def __init__(self, verbose: bool = True):
+        self._verbose = verbose
+        self.reset()
+
+    def __enter__(self):
+        if self._verbose:
+            print("start...")
+        self.start()
+        return self
+
+    def __exit__(self, exc_type: Type[Exception], exc_val: Exception, exc_tb: TracebackType):
+        self.stop()
+        if self._verbose:
+            print(f"finish with using {self.time:.2f}s")
+
+    def __len__(self):
+        return self.len
+
+    def start(self) -> None:
+        self._tik = time()
+
+    def stop(self) -> float:
+        interval = time() - self._tik
+        self._times.append(interval)
+        return interval
+
+    def reset(self) -> None:
+        self._times = list()
+        self._tik = None
+
+    @property
+    def times(self) -> list:
+        return self._times.copy()
+
+    @property
+    def time(self) -> float:
+        return self._times[-1]
+
+    @property
+    def len(self) -> int:
+        return len(self._times)
+
+    @property
+    def sum(self) -> float:
+        return sum(self._times)
+
+    @property
+    def avg(self) -> float:
+        return self.sum / self.len
+
+    @property
+    def cumsum(self) -> List[float]:
+        return np.array(self._times).cumsum().tolist()
+
+
 class String:
     @classmethod
-    def backstep_format_params(cls, template, string):
+    def backstep_format_params(cls, template: str, string: str) -> Dict[str, str]:
         assert not re.search("}{", template)  # template的参数不能紧挨着
 
         keys = [m.group(1) for m in re.finditer(r"{(\w*)}", template)]
@@ -159,10 +221,19 @@ class String:
         return dict(zip(keys, values))
 
 
-@cache
 class Database:
-    def __init__(self, database: str):
-        self.connection = sqlite3.connect(database)
+    def __init__(self, database_path: str):
+        self.database_path = database_path
 
     def query(self, sql: str, *args, **kwargs) -> pd.DataFrame:
-        return pd.read_sql(sql, self.connection, *args, **kwargs)
+        connection = sqlite3.connect(self.database_path)
+        return pd.read_sql(sql, connection, *args, **kwargs)
+
+    # 加了@cache的实例、sqlite3.Connection不能pickle，因此只能每次查询时新建连接（反正创建连接很快，而且sqlite3内部应该会维护连接线程池）
+    # notebook使用多进程时有小概率一开始就卡住，多试几次就好了
+    def batch_query(self, sqls: List[str], max_workers: int = os.cpu_count(), tqdm_desc: Optional[str] = None,
+                    *args, **kwargs) -> List[pd.DataFrame]:
+        with ProcessPoolExecutor(max_workers) as executor:
+            futures = [executor.submit(self.query, sql, *args, **kwargs) for sql in sqls]
+            # as_completed(futures)是按执行完成顺序返回的
+            return [future.result() for future in tqdm(futures, tqdm_desc)]
