@@ -35,6 +35,21 @@ stock_to_table = {
     "A股": "A股票日行情表",
     "港股": "港股票日行情表"
 }
+rankzh_to_rank = {
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9
+}
+target_to_column = {
+    "成交量": "成交量(股)",
+    "成交金额": "成交金额(元)"
+}
 
 
 @Manager(
@@ -136,7 +151,7 @@ def gen3a(year=None, report=None, role=None, percent=None):
 
 @Manager(
     cluster=3,
-    question_template="请帮我查询下，在{year}年{season}季报报告中，{code}基金的第{numzh}大重仓可转债同期还有多少只基金也进行了持仓？",
+    question_template="请帮我查询下，在{year}年{season}季报报告中，{code}基金的第{rankzh}大重仓可转债同期还有多少只基金也进行了持仓？",
     # 问题是问“还有”，因此要扣除自己
     sql_template="""
     WITH t1 AS (
@@ -151,14 +166,14 @@ def gen3a(year=None, report=None, role=None, percent=None):
         SELECT 对应股票代码
         FROM t1
         WHERE 基金代码 = '{code}'
-        AND 第N大重仓股 = {num}
+        AND 第N大重仓股 = {rank}
         LIMIT 1
     )
     AND 基金代码 != '{code}'
     LIMIT 1;
     """
 )
-def gen3b(year=None, season=None, code=None, numzh=None):
+def gen3b(year=None, season=None, code=None, rankzh=None):
     season_to_monthday = {
         "Q1": "0331",
         "Q2": "0630",
@@ -168,27 +183,16 @@ def gen3b(year=None, season=None, code=None, numzh=None):
     season = season or choice_from_dict(season_to_monthday)
     monthday = season_to_monthday[season]
 
-    numzh_to_num = {
-        "一": 1,
-        "二": 2,
-        "三": 3,
-        "四": 4,
-        "五": 5,
-        "六": 6,
-        "七": 7,
-        "八": 8,
-        "九": 9
-    }
-    numzh = numzh or choice_from_dict(numzh_to_num)
+    rankzh = rankzh or choice_from_dict(rankzh_to_rank)
     table = "基金可转债持仓明细"
 
     return dict(
         year=year or choice(years),
         season=season,
         code=code or choice_from_column(table, "基金代码"),
-        numzh=numzh,
+        rankzh=rankzh,
         monthday=monthday,
-        num=numzh_to_num[numzh]
+        rank=rankzh_to_rank[rankzh]
     )
 
 
@@ -284,10 +288,6 @@ def gen6(manager=None, category=None):
     """
 )
 def gen7a(date=None, industry1=None, target=None):
-    target_to_column = {
-        "成交量": "成交量(股)",
-        "成交金额": "成交金额(元)"
-    }
     target = target or choice_from_dict(target_to_column)
     table = "A股公司行业划分表"
 
@@ -548,4 +548,47 @@ def gen12(name=None, year=None, report=None, rank=None, compare=None):
         start=start,
         end=end,
         sign=compare_to_sign[compare]
+    )
+
+
+@Manager(
+    cluster=13,
+    question_template="{date}日，{target}最大的前{rankzh}家上市公司的股票代码是什么？按成交金额从大到小给出",
+    # A股和港股都有数据，不确定问题在问哪个，决定两个都查然后UNION起来。评价指标以召回率为主，这样做ok
+    # 但发现港股有不少同一股票使用不同的股票代码，除了代码以外，其它字段完全一样，导致港股前三往往实际是同一只股票
+    sql_template="""
+    WITH t1 AS (
+        SELECT 'A股' AS 市场, 股票代码, [{column}]
+        FROM A股票日行情表
+        WHERE 交易日 = '{date}'
+        ORDER BY [{column}] DESC
+        LIMIT {rank}
+    ),
+    t2 AS (
+        SELECT '港股' AS 市场, 股票代码, [{column}]
+        FROM 港股票日行情表
+        WHERE 交易日 = '{date}'
+        ORDER BY [{column}] DESC
+        LIMIT {rank}
+    )
+    SELECT 市场, 股票代码
+    FROM (
+        SELECT * FROM t1
+        UNION
+        SELECT * FROM t2
+    )
+    ORDER BY 市场 ASC, [{column}] DESC
+    """
+)
+def gen13(date=None, target=None, rankzh=None):
+    target = target or choice_from_dict(target_to_column)
+    rankzh = rankzh or choice_from_dict(rankzh_to_rank)
+    table = "A股票日行情表"
+
+    return dict(
+        date=date or choice_from_column(table, "交易日"),
+        target=target,
+        rankzh=rankzh,
+        column=target_to_column[target],
+        rank=rankzh_to_rank[rankzh]
     )

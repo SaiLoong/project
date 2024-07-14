@@ -69,12 +69,12 @@ class Manager(metaclass=ManagerMeta):
         self.generators[self.cluster].append(generator)
         return generator
 
-    # 0-12已验证ok
+    # 0-13已验证ok
     @classmethod
-    def validate(cls, cluster=None):
+    def validate(cls, cluster=None, verbose=False):
         if cluster is None:
             for cluster in cls.generators.keys():
-                cls.validate(cluster)
+                cls.validate(cluster, verbose)
         else:
             questions = cls.questions[cluster]
             generators = cls.generators[cluster]
@@ -93,5 +93,11 @@ class Manager(metaclass=ManagerMeta):
             # 每个generator批量执行负责的问题，并检查查询结果是否为空
             for generator, _questions in zip(generators, assign_questions):
                 for question, sql, result in generator.batch_query(_questions, tqdm_desc=f"聚类{cluster}"):
+                    if verbose:
+                        print(f"[{cluster=}]\n{question=}\n{sql=}\n{result=}\n")
+
                     if not result:
                         print(f"聚类{cluster}的问题{repr(question)}查询结果为空，SQL:\n{sql}")
+
+# TODO
+#  1. Generator从gen3b函数中提取name，然后Manager在注册generators时发现name重叠就删掉旧generator
