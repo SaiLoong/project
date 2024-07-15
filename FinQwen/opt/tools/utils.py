@@ -142,6 +142,10 @@ class File:
         with open(path, "r") as file:
             return json.load(file, *args, **kwargs)
 
+    @classmethod
+    def dataframe_to_jsonl(cls, df: pd.DataFrame, path: str, *args, **kwargs) -> None:
+        df.to_json(path, orient="records", force_ascii=False, lines=True, *args, **kwargs)
+
 
 class Timer:
     def __init__(self, verbose: bool = True):

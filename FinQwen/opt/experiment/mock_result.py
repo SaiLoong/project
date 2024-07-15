@@ -4,21 +4,17 @@
 # @date 2024/7/8
 
 from ..tools.config import Config
-
-
-def to_json(df, file_name):
-    df.to_json(f"{Config.EXPERIMENT_OUTPUT_DIR}/{file_name}", orient="records", force_ascii=False, lines=True)
-
+from ..tools.utils import File
 
 question_df = Config.get_question_df(rename=False)
 
 empty_question_df = question_df.copy()
 empty_question_df["answer"] = ""
-to_json(empty_question_df, "empty_submit_result.jsonl")
+File.dataframe_to_jsonl(empty_question_df, f"{Config.EXPERIMENT_OUTPUT_DIR}/empty_submit_result.jsonl")
 
 repeat_question_df = question_df.copy()
 repeat_question_df["answer"] = question_df["question"]
-to_json(repeat_question_df, "repeat_submit_result.jsonl")
+File.dataframe_to_jsonl(repeat_question_df, f"{Config.EXPERIMENT_OUTPUT_DIR}/repeat_submit_result.jsonl")
 
 """
 总结：

@@ -61,7 +61,7 @@ class Generator0(Generator):
     ORDER BY 差额 DESC
     LIMIT 1;
     """
-    answer_template: str = "在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是{基金简称}，差额是{差额}份"
+    answer_template: str = "在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是{基金简称}，差额是{差额:.2f}份"
 
     def preprocess_params(self, year=None, month=None):
         months = ["03", "06", "09", "12"]
