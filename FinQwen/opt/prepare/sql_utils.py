@@ -20,6 +20,7 @@ class Generator:
     def __post_init__(self):
         self.sql_template = self.sql_template.replace("\n    ", "\n").strip()
         self.database = Config.get_database()
+        self.name = self.preproccess_params_function.__name__
 
     def __call__(self, **params):
         params = self.preproccess_params_function(**params)
@@ -53,7 +54,7 @@ class Generator:
 class ManagerMeta(type):
     def __init__(cls, name, bases, attr):
         super().__init__(name, bases, attr)
-        cls.generators = defaultdict(list)
+        cls.generators = defaultdict(dict)
         cls.aggregation_df = Config.get_sql_question_aggregation_df()
         cls.questions = {cluster: df["问题"].tolist() for cluster, df in cls.aggregation_df.groupby("问题聚类")}
 
@@ -66,18 +67,19 @@ class Manager(metaclass=ManagerMeta):
 
     def __call__(self, func: Callable):
         generator = Generator(self.question_template, self.sql_template, func)
-        self.generators[self.cluster].append(generator)
+        self.generators[self.cluster][func.__name__] = generator
         return generator
 
-    # 0-13已验证ok
+    # 0-15已验证ok
     @classmethod
     def validate(cls, cluster=None, verbose=False):
         if cluster is None:
-            for cluster in cls.generators.keys():
-                cls.validate(cluster, verbose)
+            for cluster, generators in cls.generators.items():
+                if generators:
+                    cls.validate(cluster, verbose)
         else:
             questions = cls.questions[cluster]
-            generators = cls.generators[cluster]
+            generators = cls.generators[cluster].values()
 
             # 将问题分配给适合的generator
             assign_questions = [list() for _ in range(len(generators))]
@@ -88,7 +90,7 @@ class Manager(metaclass=ManagerMeta):
                         assign_questions[idx].append(question)
                         break
                 else:
-                    print(f"聚类{cluster}的问题{repr(question)}匹配失败")
+                    print(f"[警告] 聚类{cluster}的问题{repr(question)}匹配失败")
 
             # 每个generator批量执行负责的问题，并检查查询结果是否为空
             for generator, _questions in zip(generators, assign_questions):
@@ -97,7 +99,4 @@ class Manager(metaclass=ManagerMeta):
                         print(f"[{cluster=}]\n{question=}\n{sql=}\n{result=}\n")
 
                     if not result:
-                        print(f"聚类{cluster}的问题{repr(question)}查询结果为空，SQL:\n{sql}")
-
-# TODO
-#  1. Generator从gen3b函数中提取name，然后Manager在注册generators时发现name重叠就删掉旧generator
+                        print(f"[警告] 聚类{cluster}的问题{repr(question)}查询结果为空，SQL:\n{sql}")

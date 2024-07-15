@@ -5,12 +5,20 @@
 
 from ..tools.config import Config
 
+
+def to_json(df, file_name):
+    df.to_json(f"{Config.EXPERIMENT_OUTPUT_DIR}/{file_name}", orient="records", force_ascii=False, lines=True)
+
+
 question_df = Config.get_question_df(rename=False)
 
-question_df["answer"] = question_df["question"]
+empty_question_df = question_df.copy()
+empty_question_df["answer"] = ""
+to_json(empty_question_df, "empty_submit_result.jsonl")
 
-question_df.to_json(f"{Config.EXPERIMENT_OUTPUT_DIR}/mock_submit_result.jsonl", orient="records", force_ascii=False,
-                    lines=True)
+repeat_question_df = question_df.copy()
+repeat_question_df["answer"] = question_df["question"]
+to_json(repeat_question_df, "repeat_submit_result.jsonl")
 
 """
 总结：

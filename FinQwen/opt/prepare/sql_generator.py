@@ -76,9 +76,9 @@ def gen0(year=None, month=None):
     cluster=1,
     question_template="请帮我查询在截止{year}-{monthday}的基金定期报告中，基金总赎回份额为零的基金有几个？",
     sql_template="""
-    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    SELECT COUNT(基金代码) AS 数量
     FROM 基金规模变动表
-    WHERE 截止日期 LIKE '{year}-{monthday}%'
+    WHERE 截止日期 = '{year}-{monthday} 00:00:00'
     AND 报告类型 = '基金定期报告'
     AND 报告期基金总赎回份额 = 0
     LIMIT 1;
@@ -97,7 +97,7 @@ def gen1(year=None, monthday=None):
     cluster=2,
     question_template="帮我查一下在{year}年，代码为{code}的{stock}股票今开盘{compare}昨收盘的天数？",
     sql_template="""
-    SELECT COUNT(DISTINCT(交易日)) AS 天数
+    SELECT COUNT(交易日) AS 天数
     FROM {table}
     WHERE 股票代码 = '{code}'
     AND 交易日 LIKE '{year}%'
@@ -129,7 +129,7 @@ def gen2(year=None, code=None, stock=None, compare=None):
     cluster=3,
     question_template="针对{year}年的{report}，有多少家基金的{role}持有份额占比不足{percent}%?",
     sql_template="""
-    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    SELECT COUNT(基金代码) AS 数量
     FROM 基金份额持有人结构
     WHERE 定期报告所属年度 = {year}
     AND 报告类型 = '{report}'
@@ -152,6 +152,7 @@ def gen3a(year=None, report=None, role=None, percent=None):
 @Manager(
     cluster=3,
     question_template="请帮我查询下，在{year}年{season}季报报告中，{code}基金的第{rankzh}大重仓可转债同期还有多少只基金也进行了持仓？",
+    # “WHERE 对应股票代码 = (..)”里共限定了四个条件，其实已经保证必然只有一条记录。外面有三个条件限制，因此 基金代码 必然唯一
     # 问题是问“还有”，因此要扣除自己
     sql_template="""
     WITH t1 AS (
@@ -160,7 +161,7 @@ def gen3a(year=None, report=None, role=None, percent=None):
         WHERE 持仓日期 = '{year}{monthday}'
         AND 报告类型 = '季报'
     )
-    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    SELECT COUNT(基金代码) AS 数量
     FROM t1
     WHERE 对应股票代码 = (
         SELECT 对应股票代码
@@ -254,7 +255,7 @@ def gen5(date=None, report=None, name=None):
     cluster=6,
     question_template="{manager}管理的{category}产品的数量有多少?",
     sql_template="""
-    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    SELECT COUNT(基金代码) AS 数量
     FROM 基金基本信息
     WHERE 管理人 = '{manager}'
     AND 基金类型 = '{category}'
@@ -274,6 +275,7 @@ def gen6(manager=None, category=None):
     cluster=7,
     question_template="{date}日，一级行业为{industry1}的股票的{target}合计是多少？取整。",
     # 问题没有明确是中信还是申万标准，有的一级行业只有一边有，有的两边都有，不过不影响结果
+    # A股票日行情表 里，股票代码 + 交易日 是唯一的
     sql_template="""
     SELECT CAST(SUM([{column}]) AS INTEGER) AS {target}合计
     FROM A股票日行情表
@@ -303,7 +305,7 @@ def gen7a(date=None, industry1=None, target=None):
     cluster=7,
     question_template="请帮我计算：在{date}，日收益率为{compare}的{stock}股票有几个。",
     sql_template="""
-    SELECT COUNT(DISTINCT(股票代码)) AS 数量
+    SELECT COUNT(股票代码) AS 数量
     FROM {table}
     WHERE 交易日 = '{date}'
     AND [收盘价(元)] {sign} [昨收盘(元)]
@@ -364,7 +366,7 @@ def gen8(date=None, standard=None, industry1=None):
     cluster=9,
     question_template="我想知道{company}在{year}年成立了多少只管理费率{compare}于{percent}%的基金？",
     sql_template="""
-    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    SELECT COUNT(基金代码) AS 数量
     FROM 基金基本信息
     WHERE 管理人 = '{company}'
     AND 成立日期 LIKE '{year}%'
@@ -392,11 +394,12 @@ def gen9(company=None, year=None, compare=None, percent=None):
 @Manager(
     cluster=10,
     question_template="{date}港股{compare}的股票家数有多少家?",
+    # id=295('20201211港股下跌的股票家数有多少家?')的答案是2961，即使用 昨收盘、不使用DISTINCT
     sql_template="""
-    SELECT COUNT(DISTINCT(股票代码)) AS 数量
+    SELECT COUNT(股票代码) AS 数量
     FROM 港股票日行情表
     WHERE 交易日 = '{date}'
-    AND [收盘价(元)] {sign} [今开盘(元)]
+    AND [收盘价(元)] {sign} [昨收盘(元)]
     LIMIT 1;
     """
 )
@@ -485,6 +488,7 @@ def gen11(name=None, year=None, season=None, rank=None):
     question_template="我想知道{name}基金，在{year}年{report}中，前{rank}大重仓股中，有多少只股票在报告期内取得{compare}收益。",
     # 问题11的加强版，从计算一个股票改为计算多个股票
     # t5、t6还可以用 RANK() OVER (PARTITION BY 股票代码 ORDER BY 交易日 ASC) 的方式排序然后选择第1个，更通用
+    # 由于t5、t6有“GROUP BY 股票代码”，因此最后的股票代码一定是唯一的，不加DISTINCT
     sql_template="""
     WITH t1 AS (
         SELECT 股票代码
@@ -577,7 +581,7 @@ def gen12(name=None, year=None, report=None, rank=None, compare=None):
         UNION
         SELECT * FROM t2
     )
-    ORDER BY 市场 ASC, [{column}] DESC
+    ORDER BY 市场 ASC, [{column}] DESC;
     """
 )
 def gen13(date=None, target=None, rankzh=None):
@@ -591,4 +595,72 @@ def gen13(date=None, target=None, rankzh=None):
         rankzh=rankzh,
         column=target_to_column[target],
         rank=rankzh_to_rank[rankzh]
+    )
+
+
+@Manager(
+    cluster=14,
+    question_template="{date}日，请给出{name}基金的管理人和累计单位净值。",
+    sql_template="""
+    SELECT t1.管理人, t2.累计单位净值
+    FROM 基金基本信息 t1 JOIN 基金日行情表 t2
+    ON t1.基金代码 = t2.基金代码
+    AND t1.基金简称 = '{name}'
+    AND t2.交易日期 = '{date}'
+    LIMIT 1;
+    """
+)
+def gen14a(date=None, name=None):
+    table1 = "基金基本信息"
+    table2 = "基金日行情表"
+
+    return dict(
+        date=date or choice_from_column(table2, "交易日期"),
+        name=name or choice_from_column(table1, "基金简称")
+    )
+
+
+@Manager(
+    cluster=14,
+    question_template="{date}日，请给出{name}基金的管理人和单位净值。单位净值保留两位小数。",
+    sql_template="""
+    SELECT t1.管理人, ROUND(t2.单位净值, 2) AS 单位净值
+    FROM 基金基本信息 t1 JOIN 基金日行情表 t2
+    ON t1.基金代码 = t2.基金代码
+    AND t1.基金简称 = '{name}'
+    AND t2.交易日期 = '{date}'
+    LIMIT 1;
+    """
+)
+def gen14b(date=None, name=None):
+    table1 = "基金基本信息"
+    table2 = "基金日行情表"
+
+    return dict(
+        date=date or choice_from_column(table2, "交易日期"),
+        name=name or choice_from_column(table1, "基金简称")
+    )
+
+
+@Manager(
+    cluster=15,
+    question_template="请列出{manager}在{year}年成立并且托管人为{trustee}的所有基金的基金{column}的平均数。",
+    sql_template="""
+    SELECT AVG({column}) AS 平均{column}
+    FROM 基金基本信息
+    WHERE 管理人 = '{manager}'
+    AND 托管人 = '{trustee}'
+    AND 成立日期 LIKE '{year}%' 
+    LIMIT 1;
+    """
+)
+def gen15(manager=None, year=None, trustee=None, column=None):
+    columns = ["管理费率", "托管费率"]
+    table = "基金基本信息"
+
+    return dict(
+        manager=manager or choice_from_column(table, "管理人"),
+        year=year or choice(years),
+        trustee=trustee or choice_from_column(table, "托管人"),
+        column=column or choice(columns)
     )
