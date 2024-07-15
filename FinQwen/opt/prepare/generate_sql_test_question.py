@@ -75,41 +75,39 @@ A股公司行业划分表：
 """
 
 
-@Manager(
-    cluster=16,
-    question_template="",
-    sql_template=""
+@GeneratorDecorator(
+    cluster=0,
+    question_template="请帮我查询下，在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是什么？差额有多少？保留两位小数。",
+    sql_template="""
+    SELECT 基金简称, ROUND(报告期基金总申购份额 - 报告期基金总赎回份额, 2) AS 差额
+    FROM 基金规模变动表
+    WHERE 截止日期 LIKE '{year}-{month}%'
+    ORDER BY 差额 DESC
+    LIMIT 1;
+    """,
+    answer_template="在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是{基金简称}，差额是{差额}份"
 )
-def gen16():
-    table = ""
-    return dict(
+def gen0(year=None, month=None):
+    months = ["03", "06", "09", "12"]
 
+    return dict(
+        year=year or choice(years),
+        month=month or choice(months)
     )
 
 
-gen16()
+answer = "在2019年09月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是鹏华添利宝货币B，差额是46226592575.53"
 
-Manager.validate(cluster=16, verbose=True)
 
-question = "请查询：在2021的年度报告中，个人投资者持有基金份额大于机构投资者持有基金份额的基金属于货币型类型的有几个。"
-
-sql = """
-SELECT *
-FROM 基金份额持有人结构
-WHERE 定期报告所属年度 = 2021
-AND 报告类型 = '年度报告'
-AND 个人投资者持有的基金份额 > 机构投资者持有的基金份额
-LIMIT 100;
-"""
-
-db.query(sql)
+def postprocess(result):
+    return result[0]
 
 
 # =====================================================================================================
 # 模板
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=NotImplemented,
     question_template="",
     sql_template=""
@@ -123,7 +121,7 @@ def gen():
 
 gen()
 
-Manager.validate(cluster=NotImplemented, verbose=True)
+GeneratorDecorator.validate(cluster=NotImplemented, verbose=True)
 
 question = ""
 
@@ -158,3 +156,16 @@ db.query(sql)
 #  每个模板，用自己负责的问题生成完整答案（其它问题置空），看分数够接不接近0.17 * 问题数，根据分数的范围就知道是哪里的问题
 #  可以改造validate方法，要求生成submit_json
 #  这样所有不确定因素（上面的问题）都能通过尝试确定了
+#  开了小号，这样每天有20次提交机会。但是切小号DSW会断，因此最好一次生成一大批submit_json再切小号处理
+
+
+question = "请查询：在2021的年度报告中，个人投资者持有基金份额大于机构投资者持有基金份额的基金属于货币型类型的有几个。"
+
+sql = """
+SELECT *
+FROM 基金份额持有人结构
+WHERE 定期报告所属年度 = 2021
+AND 报告类型 = '年度报告'
+AND 个人投资者持有的基金份额 > 机构投资者持有的基金份额
+LIMIT 100;
+"""

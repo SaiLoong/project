@@ -8,7 +8,7 @@
 from random import choice
 from random import randint
 
-from sql_utils import Manager
+from sql_utils import GeneratorDecorator
 from ..tools.config import Config
 
 db_metadata = Config.get_database_metadata()
@@ -52,7 +52,7 @@ target_to_column = {
 }
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=0,
     question_template="请帮我查询下，在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是什么？差额有多少？保留两位小数。",
     sql_template="""
@@ -72,7 +72,7 @@ def gen0(year=None, month=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=1,
     question_template="请帮我查询在截止{year}-{monthday}的基金定期报告中，基金总赎回份额为零的基金有几个？",
     sql_template="""
@@ -93,7 +93,7 @@ def gen1(year=None, monthday=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=2,
     question_template="帮我查一下在{year}年，代码为{code}的{stock}股票今开盘{compare}昨收盘的天数？",
     sql_template="""
@@ -125,7 +125,7 @@ def gen2(year=None, code=None, stock=None, compare=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=3,
     question_template="针对{year}年的{report}，有多少家基金的{role}持有份额占比不足{percent}%?",
     sql_template="""
@@ -149,7 +149,7 @@ def gen3a(year=None, report=None, role=None, percent=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=3,
     question_template="请帮我查询下，在{year}年{season}季报报告中，{code}基金的第{rankzh}大重仓可转债同期还有多少只基金也进行了持仓？",
     # “WHERE 对应股票代码 = (..)”里共限定了四个条件，其实已经保证必然只有一条记录。外面有三个条件限制，因此 基金代码 必然唯一
@@ -197,7 +197,7 @@ def gen3b(year=None, season=None, code=None, rankzh=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=4,
     question_template="我想知道{name}基金在{date}的{report}中，其可转债持仓占比最大的是哪个行业？用{standard}一级行业来统计。",
     sql_template="""
@@ -228,7 +228,7 @@ def gen4(name=None, date=None, report=None, standard=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=5,
     question_template="在{date}的{report}中，{name}基金的债券持仓,其持有最大仓位的债券类型是什么?",
     sql_template="""
@@ -251,7 +251,7 @@ def gen5(date=None, report=None, name=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=6,
     question_template="{manager}管理的{category}产品的数量有多少?",
     sql_template="""
@@ -271,7 +271,7 @@ def gen6(manager=None, category=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=7,
     question_template="{date}日，一级行业为{industry1}的股票的{target}合计是多少？取整。",
     # 问题没有明确是中信还是申万标准，有的一级行业只有一边有，有的两边都有，不过不影响结果
@@ -301,7 +301,7 @@ def gen7a(date=None, industry1=None, target=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=7,
     question_template="请帮我计算：在{date}，日收益率为{compare}的{stock}股票有几个。",
     sql_template="""
@@ -331,7 +331,7 @@ def gen7b(date=None, compare=None, stock=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=8,
     question_template="请帮我计算，在{date}，{standard}行业分类划分的一级行业为{industry1}行业中，涨跌幅最大股票的股票代码是？涨跌幅是多少？百分数保留两位小数。股票涨跌幅定义为：（收盘价 - 前一日收盘价 / 前一日收盘价）* 100%。",
     sql_template="""
@@ -362,7 +362,7 @@ def gen8(date=None, standard=None, industry1=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=9,
     question_template="我想知道{company}在{year}年成立了多少只管理费率{compare}于{percent}%的基金？",
     sql_template="""
@@ -391,7 +391,7 @@ def gen9(company=None, year=None, compare=None, percent=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=10,
     question_template="{date}港股{compare}的股票家数有多少家?",
     # id=295('20201211港股下跌的股票家数有多少家?')的答案是2961，即使用 昨收盘、不使用DISTINCT
@@ -418,7 +418,7 @@ def gen10(date=None, compare=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=11,
     question_template="我想了解{name}基金,在{year}年{season}的季报第{rank}大重股。该持仓股票当个季度的涨跌幅?请四舍五入保留百分比到小数点两位。",
     # 先把股票找出来，存到t1表中（只有一条数据），股票可能在A股表也可能在港股表，SQL貌似不支持动态选择表的操作，因此只能分别查询A股和港股表，
@@ -483,7 +483,7 @@ def gen11(name=None, year=None, season=None, rank=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=12,
     question_template="我想知道{name}基金，在{year}年{report}中，前{rank}大重仓股中，有多少只股票在报告期内取得{compare}收益。",
     # 问题11的加强版，从计算一个股票改为计算多个股票
@@ -555,7 +555,7 @@ def gen12(name=None, year=None, report=None, rank=None, compare=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=13,
     question_template="{date}日，{target}最大的前{rankzh}家上市公司的股票代码是什么？按成交金额从大到小给出",
     # A股和港股都有数据，不确定问题在问哪个，决定两个都查然后UNION起来。评价指标以召回率为主，这样做ok
@@ -598,7 +598,7 @@ def gen13(date=None, target=None, rankzh=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=14,
     question_template="{date}日，请给出{name}基金的管理人和累计单位净值。",
     sql_template="""
@@ -620,7 +620,7 @@ def gen14a(date=None, name=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=14,
     question_template="{date}日，请给出{name}基金的管理人和单位净值。单位净值保留两位小数。",
     sql_template="""
@@ -642,7 +642,7 @@ def gen14b(date=None, name=None):
     )
 
 
-@Manager(
+@GeneratorDecorator(
     cluster=15,
     question_template="请列出{manager}在{year}年成立并且托管人为{trustee}的所有基金的基金{column}的平均数。",
     sql_template="""
