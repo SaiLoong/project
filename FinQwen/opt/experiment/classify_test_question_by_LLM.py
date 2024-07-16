@@ -174,9 +174,6 @@ print(f"公司名称识别正确率：{company_correct_num / text_num:.2%}")
 # 展示bad case
 text_df.query("公司名称识别正确 == False")
 
-# 保存下来，不要浪费
-# category_df.to_csv(f"{Config.EXPERIMENT_OUTPUT_DIR}/question_category_by_LLM_v15.csv", index=False)
-
 """
 结论：
 

@@ -143,14 +143,19 @@ class File:
             return json.load(file, *args, **kwargs)
 
     @classmethod
-    def dataframe_to_json(cls, df: pd.DataFrame, path: str, orient: str = "records", force_ascii: bool = False, *args,
-                          **kwargs) -> None:
-        df.to_json(path, orient=orient, force_ascii=force_ascii, *args, **kwargs)
+    def dataframe_to_json(cls, df: pd.DataFrame, path: str, orient: str = "records", force_ascii: bool = False,
+                          indent: Optional[int] = 4, *args, **kwargs) -> None:
+        df.to_json(path, orient=orient, force_ascii=force_ascii, indent=indent, *args, **kwargs)
 
     @classmethod
-    def dataframe_to_jsonl(cls, df: pd.DataFrame, path: str, orient: str = "records", force_ascii: bool = False, *args,
-                           **kwargs) -> None:
-        cls.dataframe_to_json(df, path, orient=orient, force_ascii=force_ascii, lines=True, *args, **kwargs)
+    def dataframe_to_jsonl(cls, df: pd.DataFrame, path: str, orient: str = "records", force_ascii: bool = False,
+                           indent: Optional[int] = None, *args, **kwargs) -> None:
+        cls.dataframe_to_json(df, path, orient=orient, force_ascii=force_ascii, indent=indent, lines=True, *args,
+                              **kwargs)
+
+    @classmethod
+    def dataframe_to_csv(cls, df: pd.DataFrame, path: str, index: bool = False, *args, **kwargs) -> None:
+        df.to_csv(path, index=index, *args, **kwargs)
 
 
 class Timer:

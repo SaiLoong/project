@@ -59,7 +59,7 @@ for label, _questions in cluster_questions.items():
 
 # 保存，json形式方便人工查看，csv形式保留更多信息
 File.json_dump(cluster_questions, f"{Config.PREPARE_OUTPUT_DIR}/sql_question_aggregation.json")
-question_df.to_csv(Config.SQL_QUESTION_AGGREGATION_PATH, index=False)
+File.dataframe_to_csv(question_df, Config.SQL_QUESTION_AGGREGATION_PATH)
 
 """
 结论：簇数为57时轮廓系数最大，0.6411

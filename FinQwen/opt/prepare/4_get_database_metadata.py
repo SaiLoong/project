@@ -24,7 +24,7 @@ File.makedirs(sample_database_dir)
 for table in tqdm(tables):
     # 貌似结果是固定的
     sample_df = db.query(f"SELECT * FROM {table} LIMIT {Config.DATABASE_RECORD_SAMPLE_NUM};")
-    sample_df.to_csv(f"{sample_database_dir}/{table}.csv", index=False)
+    File.dataframe_to_csv(sample_df, f"{sample_database_dir}/{table}.csv")
 
 # 收集每个表每个字段的唯一值信息
 db_metadata = dict()

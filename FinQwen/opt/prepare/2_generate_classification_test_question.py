@@ -78,4 +78,4 @@ company_to_cid_mapping = company_df.set_index(keys="公司名称")["公司id"].t
 test_question_df["公司id标签"] = test_question_df["公司名称标签"].map(company_to_cid_mapping)
 
 # 保存到intermediate文件夹
-test_question_df.to_csv(Config.CLASSIFICATION_TEST_QUESTION_PATH, index=False)
+File.dataframe_to_csv(test_question_df, Config.CLASSIFICATION_TEST_QUESTION_PATH)

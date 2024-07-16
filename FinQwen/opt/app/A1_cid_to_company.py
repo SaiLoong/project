@@ -34,7 +34,7 @@ assert company_df.query(f"公司名称 in {keys}").empty
 assert len(company_df.query(f"公司名称 in {values}")) == len(values)
 
 # 保存修正后的映射表
-company_df.to_csv(Config.COMPANY_PATH, index=False)
+File.dataframe_to_csv(company_df, Config.COMPANY_PATH)
 
 
 # 将txt文件和pdf文件拷贝成中文文件名，方遍浏览

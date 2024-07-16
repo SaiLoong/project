@@ -10,6 +10,7 @@ import numpy as np
 
 from ..tools.config import Config
 from ..tools.constant import Category
+from ..tools.utils import File
 
 tokenizer = Config.get_tokenizer()
 
@@ -54,4 +55,4 @@ classification_df.query(f"问题分类 == '{Category.SQL}'").sort_values("最大
 
 # 保存
 classification_df.drop(columns=["最大相似分数", "最相似公司名称"], inplace=True)
-classification_df.to_csv(Config.QUESTION_CLASSIFICATION_PATH, index=False)
+File.dataframe_to_csv(classification_df, Config.QUESTION_CLASSIFICATION_PATH)
