@@ -3,7 +3,6 @@
 # @author zhangshilong
 # @date 2024/7/12
 
-from sql_generator import *
 from ..tools.config import Config
 
 db = Config.get_database()
@@ -74,70 +73,7 @@ A股公司行业划分表：
     个人/机构投资者持有的基金份额占总份额比例：是[0, 100]的数字
 """
 
-
-@GeneratorDecorator(
-    cluster=0,
-    question_template="请帮我查询下，在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是什么？差额有多少？保留两位小数。",
-    sql_template="""
-    SELECT 基金简称, ROUND(报告期基金总申购份额 - 报告期基金总赎回份额, 2) AS 差额
-    FROM 基金规模变动表
-    WHERE 截止日期 LIKE '{year}-{month}%'
-    ORDER BY 差额 DESC
-    LIMIT 1;
-    """,
-    answer_template="在{year}年{month}月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是{基金简称}，差额是{差额}份"
-)
-def gen0(year=None, month=None):
-    months = ["03", "06", "09", "12"]
-
-    return dict(
-        year=year or choice(years),
-        month=month or choice(months)
-    )
-
-
-answer = "在2019年09月的报告中，报告期基金总申购份额和报告期基金总赎回份额差额最大的一只基金的简称是鹏华添利宝货币B，差额是46226592575.53"
-
-
-def postprocess(result):
-    return result[0]
-
-
 # =====================================================================================================
-# 模板
-
-
-@GeneratorDecorator(
-    cluster=NotImplemented,
-    question_template="",
-    sql_template=""
-)
-def gen():
-    table = ""
-    return dict(
-
-    )
-
-
-gen()
-
-GeneratorDecorator.validate(cluster=NotImplemented, verbose=True)
-
-question = ""
-
-sql = """
-SELECT
-FROM
-WHERE
-AND
-AND
-LIMIT 100;
-"""
-
-db.query(sql)
-
-# =====================================================================================================
-# 笔记
 # 多进程要求很多：
 #   1. sqlite3.Connection不能pickle，因此必须每个进程重新连接
 #   2. 加了@cache的实例不能pickle
@@ -145,27 +81,10 @@ db.query(sql)
 
 
 # TODO 可能有的问题：
-#  聚类0、8题意模糊，不确定需不需要考虑绝对值，先不考虑，等钉钉群回复
 #  聚类13没有明确是A股还是港股（但感觉是A股）
 #  所有用到 基金股票持仓明细、基金可转债持仓明细 报告日期的sql，日期不对（但应该不可能）
 
-# TODO 事后检查： 有没有问题对不上模板、查询结果为空（原因可能为：没考虑港股、报告日期不在月末）
-
-# TODO 设计一个流程，利用提交机制验证自己写的sql是否正确
-#  目前只有c10验证了模板的正确性
-#  每个模板，用自己负责的问题生成完整答案（其它问题置空），看分数够接不接近0.17 * 问题数，根据分数的范围就知道是哪里的问题
-#  可以改造validate方法，要求生成submit_json
-#  这样所有不确定因素（上面的问题）都能通过尝试确定了
-#  开了小号，这样每天有20次提交机会。但是切小号DSW会断，因此最好一次生成一大批submit_json再切小号处理
-
-
-question = "请查询：在2021的年度报告中，个人投资者持有基金份额大于机构投资者持有基金份额的基金属于货币型类型的有几个。"
-
-sql = """
-SELECT *
-FROM 基金份额持有人结构
-WHERE 定期报告所属年度 = 2021
-AND 报告类型 = '年度报告'
-AND 个人投资者持有的基金份额 > 机构投资者持有的基金份额
-LIMIT 100;
-"""
+# TODO
+#  1. 把生成answer的功能加上，因此需要重构utils
+#  2. 编写自动生成提交文件的方法，要考虑和组合
+#  3. 各种读写文件集成到File ?
