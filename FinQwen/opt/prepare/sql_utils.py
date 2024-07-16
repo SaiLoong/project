@@ -25,6 +25,11 @@ class Record(NamedTuple):
     result: List[Dict[str, Union[str, int]]]
     answer: str
 
+    def print(self, *fields):
+        fields = fields or self._fields
+        for field in fields:
+            print(f"{field}={repr(self.__getattribute__(field))}")
+
 
 class Manager:
     generators = defaultdict(dict)
@@ -53,22 +58,21 @@ class Generator:
         self.cluster_df = self._get_cluster_df()
         self.expectation_score = round(100 / 600 * len(self.cluster_df), 2)
         self.questions = self.cluster_df["问题"].tolist()
-        self.records = None
+        self._records = None
 
         Manager.generators[self.cluster][self.name] = self
 
     def _get_cluster_df(self):
         cluster_df = self.aggregation_df.query(f"问题聚类 == {self.cluster}")
         condition = cluster_df["问题"].map(self.parse).astype(bool)
+        print(f"加载{sum(condition)}/{len(condition)}个问题")
         return cluster_df[condition].reset_index(drop=True)
 
     def preprocess_params(self, **params):
         raise NotImplementedError
 
     def postprocess_result(self, result, params):
-        if result:
-            return result[0]
-        return None
+        return result[0] if result else None
 
     def __call__(self, **params):
         params = self.preprocess_params(**params)
@@ -88,7 +92,10 @@ class Generator:
 
     def query(self, question):
         params = self.parse(question)
-        return self(**params)
+        record = self(**params)
+        # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
+        assert question == record.question, f"输入问题（{repr(question)}）与生成问题（{repr(record.question)}）不一致"
+        return record
 
     def batch_query(self, questions):
         params_list = list()
@@ -96,6 +103,9 @@ class Generator:
         for question in questions:
             params = self.parse(question)
             params = self.preprocess_params(**params)
+            # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
+            question2 = self.question_template.format(**params)
+            assert question == question2, f"输入问题（{repr(question)}）与生成问题（{repr(question2)}）不一致"
             params_list.append(params)
             sqls.append(self.sql_template.format(**params))
 
@@ -108,15 +118,24 @@ class Generator:
             records.append(Record(params, question, sql, result, answer))
         return records
 
-    def refresh_records(self):
-        if not self.records:
-            self.records = self.batch_query(self.questions)
-            for record in self.records:
+    @property
+    def records(self):
+        self.refresh_records()
+        return self._records
+
+    def refresh_records(self, force=False):
+        if force or not self._records:
+            self._records = self.batch_query(self.questions)
+            for record in self._records:
                 if not record.answer:
                     print(f"[警告！] 问题（{repr(record.question)}）没有查询到答案！SQL:\n{record.sql}")
 
-            self.cluster_df["答案"] = [record.answer for record in self.records]
-        return self.records
+            self.cluster_df["答案"] = [record.answer for record in self._records]
+
+    def print_records(self, *fields):
+        for record in self.records:
+            record.print(*fields)
+            print()
 
     def export(self):
         self.refresh_records()

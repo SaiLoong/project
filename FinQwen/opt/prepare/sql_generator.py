@@ -11,6 +11,9 @@ from random import randint
 from sql_utils import Generator
 from ..tools.config import Config
 
+# TODO debug
+db = Config.get_database()
+
 db_metadata = Config.get_database_metadata()
 distinct_values_dct = {
     table: {
@@ -30,6 +33,7 @@ def choice_from_dict(dct):
 
 
 years = [2019, 2020, 2021]
+shortyears = [year - 2000 for year in years]
 standards = ["中信", "申万"]
 stock_to_table = {
     "A股": "A股票日行情表",
@@ -45,10 +49,6 @@ rankzh_to_rank = {
     "七": 7,
     "八": 8,
     "九": 9
-}
-target_to_column = {
-    "成交量": "成交量(股)",
-    "成交金额": "成交金额(元)"
 }
 
 
@@ -327,6 +327,10 @@ class Generator7a(Generator):
     verification_score: float = 2.92  # 满分3.17。可能是中信/申万标准的问题
 
     def preprocess_params(self, date=None, industry1=None, target=None):
+        target_to_column = {
+            "成交量": "成交量(股)",
+            "成交金额": "成交金额(元)"
+        }
         target = target or choice_from_dict(target_to_column)
         table = "A股公司行业划分表"
 
@@ -338,12 +342,10 @@ class Generator7a(Generator):
         )
 
     def postprocess_result(self, result, params):
-        if result:
-            target, unit = re.fullmatch(r"(.*)\((.*)\)", params["column"]).groups()
-            return dict(
-                result=str(result[0][f"{target}合计"]) + unit
-            )
-        return None
+        # SUM一定返回一行记录（但值有可能是None）
+        target, unit = re.fullmatch(r"(.*)\((.*)\)", params["column"]).groups()
+        result = result[0][f"{target}合计"]
+        return None if result is None else dict(result=str(result) + unit)
 
 
 @dataclass
@@ -519,7 +521,7 @@ class Generator11(Generator):
     FROM t5 JOIN t6
     LIMIT 1;
     """
-    answer_template: str = "{name}基金,在{year}年{season}的季报第{rank}大重股在当个季度的涨跌幅是{涨跌幅:.2f}%"
+    answer_template: str = "{name}基金,在{year}年{season}的季报第{rank}大重股在当个季度的涨跌幅是{涨跌幅:.2f}%。"
     verification_score: float = 1.54  # 满分1.67，纯答案1.27，看不出缺少的分数是语义不接近还是错了1题
 
     def preprocess_params(self, name=None, year=None, season=None, rank=None):
@@ -653,6 +655,10 @@ class Generator13(Generator):
     verification_score: float = None  # 满分
 
     def preprocess_params(self, date=None, target=None, rankzh=None):
+        target_to_column = {
+            "成交量": "成交量(股)",
+            "成交金额": "成交金额(元)"
+        }
         target = target or choice_from_dict(target_to_column)
         rankzh = rankzh or choice_from_dict(rankzh_to_rank)
         table = "A股票日行情表"
@@ -739,7 +745,7 @@ class Generator15(Generator):
     AND 成立日期 LIKE '{year}%'
     LIMIT 1;
     """
-    answer_template: str = "{manager}在{year}年成立并且托管人为{trustee}的所有基金的基金{column}的平均数是{result}%"
+    answer_template: str = "{manager}在{year}年成立并且托管人为{trustee}的所有基金的基金{column}的平均数是{result}%。"
     verification_score: float = None  # 满分
 
     def preprocess_params(self, manager=None, year=None, trustee=None, column=None):
@@ -754,18 +760,315 @@ class Generator15(Generator):
         )
 
     def postprocess_result(self, result, params):
+        # AVG一定返回一行记录（但值有可能是None）
+        column = params["column"]
+        result = result[0][f"平均{column}"]
+        return None if result is None else dict(result=result)
+
+
+# TODO verify
+@dataclass
+class Generator16(Generator):
+    cluster: int = 16
+    question_template: str = "请查询：在{year}的{report}中，个人投资者持有基金份额{compare}机构投资者持有基金份额的基金属于{category}类型的有几个。"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM 基金基本信息
+    WHERE 基金代码 IN (
+        SELECT 基金代码
+        FROM 基金份额持有人结构
+        WHERE 定期报告所属年度 = {year}
+        AND 报告类型 = '{report}'
+        AND 个人投资者持有的基金份额 {sign} 机构投资者持有的基金份额
+    )
+    AND 基金类型 = '{category}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}的{report}中，个人投资者持有基金份额{compare}机构投资者持有基金份额的基金属于{category}类型的有{数量}个。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, report=None, compare=None, category=None):
+        compare_to_sign = {
+            "大于": ">",
+            "小于": "<"
+        }
+        compare = compare or choice_from_dict(compare_to_sign)
+        table1 = "基金份额持有人结构"
+        tabel2 = "基金基本信息"
+
+        return dict(
+            year=year or choice(years),
+            report=report or choice_from_column(table1, "报告类型"),
+            compare=compare,
+            category=category or choice_from_column(tabel2, "基金类型"),
+            sign=compare_to_sign[compare]
+        )
+
+
+# TODO verify
+@dataclass
+class Generator17(Generator):
+    cluster: int = 17
+    question_template: str = "我想知道股票{code}在{standard}行业分类下的{level}行业是什么？用最新的数据。"
+    sql_template: str = """
+    SELECT {level}行业名称
+    FROM A股公司行业划分表
+    WHERE 股票代码 = '{code}'
+    AND 行业划分标准 = '{standard}行业分类'
+    ORDER BY 交易日期 DESC
+    LIMIT 1;
+    """
+    answer_template: str = "股票{code}在{standard}行业分类下的{level}行业是{result}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, code=None, standard=None, level=None):
+        levels = ["一级", "二级"]
+        table = "A股公司行业划分表"
+
+        return dict(
+            code=code or choice_from_column(table, "股票代码"),
+            standard=standard or choice(standards),
+            level=level or choice(levels)
+        )
+
+    def postprocess_result(self, result, params):
         if result:
-            column = params["column"]
+            level = params["level"]
             return dict(
-                result=result[0][f"平均{column}"]
+                result=result[0][f"{level}行业名称"]
             )
         return None
+
+
+# TODO verify
+@dataclass
+class Generator18(Generator):
+    cluster: int = 18
+    question_template: str = "{name}基金在{date}的{report}里，前{rankzh}大持仓占比的债券名称是什么?"
+    sql_template: str = """
+    SELECT 债券名称
+    FROM 基金债券持仓明细
+    WHERE 基金简称 = '{name}'
+    AND 持仓日期 = '{date}'
+    AND 报告类型 = '{report}'
+    ORDER BY 第N大重仓股 ASC
+    LIMIT {rank};
+    """
+    answer_template: str = "{name}基金在{date}的{report}里，前{rankzh}大持仓占比的债券名称是{result}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, name=None, date=None, report=None, rankzh=None):
+        rankzh = rankzh or choice_from_dict(rankzh_to_rank)
+        table = "基金债券持仓明细"
+
+        return dict(
+            name=name or choice_from_column(table, "基金简称"),
+            date=date or choice_from_column(table, "持仓日期"),
+            report=report or choice_from_column(table, "报告类型"),
+            rankzh=rankzh,
+            rank=rankzh_to_rank[rankzh]
+        )
+
+    def postprocess_result(self, result, params):
+        if result:
+            return dict(
+                result="、".join([record["债券名称"] for record in result])
+            )
+        return None
+
+
+# TODO verify
+@dataclass
+class Generator19(Generator):
+    cluster: int = 19
+    # 参数不能紧挨着，只能出此下策
+    question_template: str = "{manager}20{shortyear}年成立了多少基金?"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM 基金基本信息
+    WHERE 管理人 = '{manager}'
+    AND 成立日期 LIKE '20{shortyear}%'
+    LIMIT 1;
+    """
+    answer_template: str = "{manager}20{shortyear}年成立了{数量}只基金。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, manager=None, shortyear=None):
+        table = "基金基本信息"
+
+        return dict(
+            manager=manager or choice_from_column(table, "管理人"),
+            shortyear=shortyear or choice(shortyears)
+        )
+
+
+# TODO verify
+@dataclass
+class Generator20(Generator):
+    cluster: int = 20
+    question_template: str = "我想知道在{year}年，{manager}已发行的基金中，有多少只基金报告期期初基金总份额{compare}报告期期末基金总份额(使用每只基金当年最晚的定期报告数据计算)？"
+    sql_template: str = """
+    WITH t1 AS (
+        SELECT *
+        FROM 基金规模变动表
+        WHERE 基金代码 IN (
+            SELECT 基金代码
+            FROM 基金基本信息
+            WHERE 管理人 = '{manager}'
+        )
+        AND 定期报告所属年度 = {year}
+        AND 报告类型 = '基金定期报告'
+        GROUP BY 基金代码
+        HAVING 截止日期 = MAX(截止日期)
+    )
+    SELECT COUNT(*) AS 数量
+    FROM t1
+    WHERE 报告期期初基金总份额 {sign} 报告期期末基金总份额
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年，{manager}已发行的基金中，有{数量}只基金报告期期初基金总份额{compare}报告期期末基金总份额。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, manager=None, compare=None):
+        compare_to_sign = {
+            "大于": ">",
+            "小于": "<"
+        }
+        compare = compare or choice_from_dict(compare_to_sign)
+        table = "基金基本信息"
+
+        return dict(
+            year=year or choice(years),
+            manager=manager or choice_from_column(table, "管理人"),
+            compare=compare,
+            sign=compare_to_sign[compare]
+        )
+
+
+# TODO verify
+@dataclass
+class Generator21(Generator):
+    cluster: int = 21
+    question_template: str = "在{year}年的{report}里，{manager}管理的基金中，有多少比例的基金是个人投资者持有的份额{compare}机构投资者？希望得到一个精确到两位小数的百分比。"
+    sql_template: str = """
+    WITH t1 AS (
+        SELECT *
+        FROM 基金份额持有人结构
+        WHERE 基金代码 IN (
+            SELECT 基金代码
+            FROM 基金基本信息
+            WHERE 管理人 = '{manager}'
+        )
+        AND 定期报告所属年度 = {year}
+        AND 报告类型 = '{report}'
+    )
+    SELECT ROUND(CAST(SUM(个人投资者持有的基金份额 {sign} 机构投资者持有的基金份额) AS FLOAT) / COUNT(*) * 100, 2) AS 比例
+    FROM t1
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年的{report}里，{manager}管理的基金中，有{比例:.2f}%的基金是个人投资者持有的份额{compare}机构投资者。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, report=None, manager=None, compare=None):
+        compare_to_sign = {
+            "超过": ">",
+            "不足": "<"
+        }
+        compare = compare or choice_from_dict(compare_to_sign)
+        table1 = "基金份额持有人结构"
+        table2 = "基金基本信息"
+
+        return dict(
+            year=year or choice(years),
+            report=report or choice_from_column(table1, "报告类型"),
+            manager=manager or choice_from_column(table2, "管理人"),
+            compare=compare,
+            sign=compare_to_sign[compare]
+        )
+
+
+# TODO verify 先只考虑A股
+@dataclass
+class Generator22(Generator):
+    cluster: int = 22
+    question_template: str = "{date}日，{target1}较上一交易日{target2}高的股票有多少只？（如上一交易日没有某只股票，则不统计在内）"
+    # 交易日并不是连续的，不能直接对date-1
+    # 如果用 GROUP BY 股票代码 HAVING 交易日=MAX(交易日)，无法保证所有股票的最后一天是同一天，与题意不符
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM A股票日行情表 t1 JOIN A股票日行情表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = '{date}'
+    AND t2.交易日 = (
+        SELECT MAX(交易日)
+        FROM A股票日行情表
+        WHERE 交易日 < '{date}'
+        LIMIT 1
+    )
+    AND t1.[{column1}] > t2.[{column2}]
+    LIMIT 1;
+    """
+    answer_template: str = "{date}日，{target1}较上一交易日{target2}高的股票有{数量}只。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, target1=None, target2=None):
+        target_to_column = {
+            "开盘价": "今开盘(元)",
+            "最高价": "最高价(元)",
+            "最低价": "最低价(元)",
+            "收盘价": "收盘价(元)"
+        }
+        target1 = target1 or choice_from_dict(target_to_column)
+        target2 = target2 or choice_from_dict(target_to_column)
+        table = "A股票日行情表"
+
+        return dict(
+            date=date or choice_from_column(table, "交易日"),
+            target1=target1,
+            target2=target2,
+            column1=target_to_column[target1],
+            column2=target_to_column[target2]
+        )
+
+
+# TODO verify
+@dataclass
+class Generator23(Generator):
+    cluster: int = 23
+    question_template: str = "我想了解一下{manager}20{shortyear}年成立的{category}基金,其{column}的平均值是多少?请四舍五入保留小数点两位。"
+    sql_template: str = """
+    SELECT ROUND(AVG({column}), 2) AS 平均{column}
+    FROM 基金基本信息
+    WHERE 管理人 = '{manager}'
+    AND 成立日期 LIKE '20{shortyear}%'
+    AND 基金类型 = '{category}'
+    LIMIT 1;
+    """
+    answer_template: str = "{manager}20{shortyear}年成立的{category}基金,其{column}的平均值是{result:.2f}%。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, manager=None, shortyear=None, category=None, column=None):
+        columns = ["管理费率", "托管费率"]
+        table = "基金基本信息"
+
+        return dict(
+            manager=manager or choice_from_column(table, "管理人"),
+            shortyear=shortyear or choice(shortyears),
+            category=category or choice_from_column(table, "基金类型"),
+            column=column or choice(columns)
+        )
+
+    def postprocess_result(self, result, params):
+        # AVG一定返回一行记录（但值有可能是None）
+        column = params["column"]
+        result = result[0][f"平均{column}"]
+        return None if result is None else dict(result=result)
 
 
 # ====================================================================
 # 模板
 
-# TODO verify
+# TODO verify ing
 @dataclass
 class Generator(Generator):
     cluster: int = NotImplemented
@@ -779,3 +1082,18 @@ class Generator(Generator):
 
         return dict(
         )
+
+
+question = ""
+
+sql = """
+SELECT *
+FROM
+WHERE
+AND
+AND
+
+LIMIT 100;
+"""
+
+db.query(sql)
