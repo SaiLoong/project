@@ -924,7 +924,7 @@ class Generator21(Generator):
     FROM t1
     LIMIT 1;
     """
-    answer_template: str = "在{year}年的{report}里，{manager}管理的基金中，有{result:.2f}%的基金是个人投资者持有的份额{compare}机构投资者。"
+    answer_template: str = "在{year}年的{report}里，{manager}管理的基金中，有{比例:.2f}%的基金是个人投资者持有的份额{compare}机构投资者。"
     # 将answer_template的{result:.2f}改为{result}，id=30/167/522/913的答案发生变化，分数降至0.90，说明这4题本来有1题答案就是错的
     # 分析发现id=522存在个人/机构的份额都为0的数据，以为这是原因，于是添加 个人投资者持有的基金份额 + 机构投资者持有的基金份额 > 0 的条件，
     #   id=522/673的答案发生变化，分数降至1.00，说明debug思路不对，而且这两题的答案本来是对的
@@ -949,8 +949,8 @@ class Generator21(Generator):
 
     def postprocess_result(self, result, params):
         # SUM一定返回一行记录，但值有可能是None
-        result = result[0]["比例"]
-        return None if result is None else dict(result=result)
+        result = result[0]
+        return None if result["比例"] is None else result
 
 
 @dataclass
@@ -1027,6 +1027,38 @@ class Generator23(Generator):
         column = params["column"]
         result = result[0][f"平均{column}"]
         return None if result is None else dict(result=result)
+
+
+@dataclass
+class Generator24(Generator):
+    cluster: int = 24
+    question_template: str = "我想知道{year}年的{report}中，{role}持有的份额占比超过{percent}%的基金有多少，并且他们总共持有了多少?记得帮我保留两位小数。"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量, ROUND(SUM({role}持有的基金份额), 2) AS 持有份额
+    FROM 基金份额持有人结构
+    WHERE 定期报告所属年度 = {year}
+    AND 报告类型 = '{report}'
+    AND {role}持有的基金份额占总份额比例 > {percent}
+    LIMIT 1;
+    """
+    answer_template: str = "{year}年的{report}中，{role}持有的份额占比超过{percent}%的基金有{数量}只，并且他们总共持有了{持有份额:.2f}份。"
+    verification_score: float = 1.60  # 满分1.67
+
+    def preprocess_params(self, year=None, report=None, role=None, percent=None):
+        roles = ["个人投资者", "机构投资者"]
+        table = "基金份额持有人结构"
+
+        return dict(
+            year=year or choice(years),
+            report=report or choice_from_column(table, "报告类型"),
+            role=role or choice(roles),
+            percent=percent or randint(1, 100)
+        )
+
+    def postprocess_result(self, result, params):
+        # SUM一定返回一行记录，但值有可能是None
+        result = result[0]
+        return None if result["持有份额"] is None else result
 
 
 # ====================================================================

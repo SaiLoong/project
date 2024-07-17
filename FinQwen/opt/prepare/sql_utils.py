@@ -25,14 +25,16 @@ class Record(NamedTuple):
     result: List[Dict[str, Union[str, int]]]
     answer: str
 
-    def print(self, *fields, expand_sql=False, end="\n"):
+    def print(self, *fields, expand_sql=False, endl=1):
         fields = fields or self._fields
+        end = "\n" * endl
+
         for field in fields:
             if field == "sql" and expand_sql:
                 quote = '"""'
-                print(f"sql={quote}\n{self.sql}\n{quote}", end=end)
+                print(f"sql = {quote}\n{self.sql}\n{quote}", end=end)
             else:
-                print(f"{field}={repr(self.__getattribute__(field))}", end=end)
+                print(f"{field} = {repr(self.__getattribute__(field))}", end=end)
 
 
 class Manager:
@@ -60,7 +62,7 @@ class Generator:
         self.question_df = Config.get_question_df()
         self.aggregation_df = Config.get_sql_question_aggregation_df()
         self.cluster_df = self._get_cluster_df()
-        self.expectation_score = round(100 / 600 * len(self.cluster_df), 2)
+        self.expectation_score = round(100 / Config.SQL_QUESTION_NUM * len(self.cluster_df), 2)
         self.questions = self.cluster_df["问题"].tolist()
         self._records = None
 
@@ -96,9 +98,10 @@ class Generator:
 
     def query(self, question):
         params = self.parse(question)
+        assert params, f"问题({repr(question)})与问题模板({repr(self.question_template)})不匹配"
         record = self(**params)
         # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
-        assert question == record.question, f"输入问题（{repr(question)}）与生成问题（{repr(record.question)}）不一致"
+        assert question == record.question, f"输入问题({repr(question)})与生成问题({repr(record.question)})不一致"
         return record
 
     def batch_query(self, questions):
@@ -106,10 +109,11 @@ class Generator:
         sqls = list()
         for question in questions:
             params = self.parse(question)
+            assert params, f"问题({repr(question)})与问题模板({repr(self.question_template)})不匹配"
             params = self.preprocess_params(**params)
             # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
             question2 = self.question_template.format(**params)
-            assert question == question2, f"输入问题（{repr(question)}）与生成问题（{repr(question2)}）不一致"
+            assert question == question2, f"输入问题({repr(question)})与生成问题({repr(question2)})不一致"
             params_list.append(params)
             sqls.append(self.sql_template.format(**params))
 
@@ -132,14 +136,14 @@ class Generator:
             self._records = self.batch_query(self.questions)
             for record in self._records:
                 if not record.answer:
-                    print(f"[警告！] 问题（{repr(record.question)}）没有查询到答案！SQL:\n{record.sql}")
+                    print(f"[警告！] 问题({repr(record.question)})没有查询到答案！SQL:\n{record.sql}")
 
             self.cluster_df["答案"] = [record.answer for record in self._records]
 
-    def print_records(self, *fields, expand_sql=False, end="\n"):
+    def print_records(self, *fields, expand_sql=False, endl=1):
         for index, record in enumerate(self.records):
             print(f"\n[{index=}]")
-            record.print(*fields, expand_sql=expand_sql, end=end)
+            record.print(*fields, expand_sql=expand_sql, endl=endl)
 
     def export(self):
         self.refresh_records()
