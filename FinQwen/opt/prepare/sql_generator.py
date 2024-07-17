@@ -342,7 +342,7 @@ class Generator7a(Generator):
         )
 
     def postprocess_result(self, result, params):
-        # SUM一定返回一行记录（但值有可能是None）
+        # SUM一定返回一行记录，但值有可能是None
         target, unit = re.fullmatch(r"(.*)\((.*)\)", params["column"]).groups()
         result = result[0][f"{target}合计"]
         return None if result is None else dict(result=str(result) + unit)
@@ -476,53 +476,45 @@ class Generator10(Generator):
         )
 
 
-# TODO 把”。该持仓股票“放进去最后一试
 @dataclass
 class Generator11(Generator):
     cluster: int = 11
     question_template: str = "我想了解{name}基金,在{year}年{season}的季报第{rank}大重股。该持仓股票当个季度的涨跌幅?请四舍五入保留百分比到小数点两位。"
-    # 先把股票找出来，存到t1表中（只有一条数据），股票可能在A股表也可能在港股表，SQL貌似不支持动态选择表的操作，因此只能分别查询A股和港股表，
-    # 然后将答案union起来得到t4表（有且只有1个表有数据）。t4表包含目标股票在目标季度内的所有数据，分别找到最早的昨收价和最晚的收盘价（不一定在季度第一天和最后一天），
-    # 存到t5、t6表，最后就能算季度的涨跌幅了（join左右子表都只有1条数据，因此不用写on）
+    # t1表包含目标股票在目标季度内的所有数据，分别找到最早的昨收价和最晚的收盘价（不一定在季度第一天和最后一天）存到t2、t3表
+    # 最后就能算季度的涨跌幅了（join左右子表都只有1条数据，因此不用写on）
     sql_template: str = """
     WITH t1 AS (
-        SELECT 股票代码
-        FROM 基金股票持仓明细
-        WHERE 基金简称 = '{name}'
-        AND 持仓日期 = '{year}{end}'
-        AND 报告类型 = '季报'
-        AND 第N大重仓股 = {rank}
-        LIMIT 1
-    ),
-    t4 AS (
         SELECT *
-        FROM A股票日行情表 t2 JOIN t1
-        ON t2.股票代码 = t1.股票代码
-        AND 交易日 BETWEEN '{year}{start}' AND '{year}{end}'
-        UNION
-        SELECT *
-        FROM 港股票日行情表 t3 JOIN t1
-        ON t3.股票代码 = t1.股票代码
+        FROM A股票日行情表
+        WHERE 股票代码 = (
+            SELECT 股票代码
+            FROM 基金股票持仓明细
+            WHERE 基金简称 = '{name}'
+            AND 持仓日期 = '{year}{end}'
+            AND 报告类型 = '季报'
+            AND 第N大重仓股 = {rank}
+            LIMIT 1
+        )
         AND 交易日 BETWEEN '{year}{start}' AND '{year}{end}'
     ),
-    t5 AS (
+    t2 AS (
         SELECT [昨收盘(元)] AS 期初价
-        FROM t4
+        FROM t1
         ORDER BY 交易日 ASC
         LIMIT 1
     ),
-    t6 AS (
+    t3 AS (
         SELECT [收盘价(元)] AS 期末价
-        FROM t4
+        FROM t1
         ORDER BY 交易日 DESC
         LIMIT 1
     )
-    SELECT ROUND((t6.期末价 / t5.期初价 - 1) * 100, 2) AS 涨跌幅
-    FROM t5 JOIN t6
+    SELECT ROUND((t3.期末价 / t2.期初价 - 1) * 100, 2) AS 涨跌幅
+    FROM t2 JOIN t3
     LIMIT 1;
     """
-    answer_template: str = "{name}基金,在{year}年{season}的季报第{rank}大重股在当个季度的涨跌幅是{涨跌幅:.2f}%。"
-    verification_score: float = 1.54  # 满分1.67，纯答案1.27，看不出缺少的分数是语义不接近还是错了1题
+    answer_template: str = "{name}基金,在{year}年{season}的季报第{rank}大重股当个季度的涨跌幅是{涨跌幅:.2f}%。"
+    verification_score: float = 1.55  # 满分1.67，纯答案1.27，看不出缺少的分数是语义不接近还是错了1题。加不加港股的答案都是一样的
 
     def preprocess_params(self, name=None, year=None, season=None, rank=None):
         season_to_start_end = {
@@ -545,54 +537,47 @@ class Generator11(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator12(Generator):
     cluster: int = 12
     question_template: str = "我想知道{name}基金，在{year}年{report}中，前{rank}大重仓股中，有多少只股票在报告期内取得{compare}收益。"
     # 问题11的加强版，从计算一个股票改为计算多个股票
-    # t5、t6还可以用 RANK() OVER (PARTITION BY 股票代码 ORDER BY 交易日 ASC) 的方式排序然后选择第1个，更通用
-    # 由于t5、t6有“GROUP BY 股票代码”，因此最后的股票代码一定是唯一的，不加DISTINCT
+    # t2、t3还可以用 RANK() OVER (PARTITION BY 股票代码 ORDER BY 交易日 ASC) 的方式排序然后选择第1个，更通用
+    # 由于t2、t3有“GROUP BY 股票代码”，因此最后的股票代码一定是唯一的，不加DISTINCT
     sql_template: str = """
     WITH t1 AS (
-        SELECT 股票代码
-        FROM 基金股票持仓明细
-        WHERE 基金简称 = '{name}'
-        AND 持仓日期 = '{year}{end}'
-        AND 报告类型 = '年报(含半年报)'
-        AND 第N大重仓股 <= {rank}
-    ),
-    t4 AS (
         SELECT *
-        FROM A股票日行情表 t2 JOIN t1
-        ON t2.股票代码 = t1.股票代码
-        AND 交易日 BETWEEN '{year}{start}' AND '{year}{end}'
-        UNION
-        SELECT *
-        FROM 港股票日行情表 t3 JOIN t1
-        ON t3.股票代码 = t1.股票代码
+        FROM A股票日行情表
+        WHERE 股票代码 IN (
+            SELECT 股票代码
+            FROM 基金股票持仓明细
+            WHERE 基金简称 = '{name}'
+            AND 持仓日期 = '{year}{end}'
+            AND 报告类型 = '年报(含半年报)'
+            AND 第N大重仓股 <= {rank}
+        )
         AND 交易日 BETWEEN '{year}{start}' AND '{year}{end}'
     ),
-    t5 AS (
+    t2 AS (
         SELECT 股票代码, [昨收盘(元)] AS 期初价
-        FROM t4
+        FROM t1
         GROUP BY 股票代码
         HAVING 交易日 = MIN(交易日)
     ),
-    t6 AS (
+    t3 AS (
         SELECT 股票代码, [收盘价(元)] AS 期末价
-        FROM t4
+        FROM t1
         GROUP BY 股票代码
         HAVING 交易日 = MAX(交易日)
     )
     SELECT COUNT(*) AS 数量
-    FROM t5 JOIN t6
-    ON t5.股票代码 = t6.股票代码
-    WHERE t6.期末价 {sign} t5.期初价
+    FROM t2 JOIN t3
+    ON t2.股票代码 = t3.股票代码
+    WHERE t3.期末价 {sign} t2.期初价
     LIMIT 1;
     """
     answer_template: str = "{name}基金，在{year}年{report}中，前{rank}大重仓股中，有{数量}只股票在报告期内取得{compare}收益。"
-    verification_score: float = None  # 满分3.33
+    verification_score: float = 3.21  # 满分3.33。不能加港股，加了有6题答案变化，分数降至2.67
 
     def preprocess_params(self, name=None, year=None, report=None, rank=None, compare=None):
         report_to_start_end = {
@@ -621,38 +606,20 @@ class Generator12(Generator):
         )
 
 
-# TODO verify  是否包含港股？
 @dataclass
 class Generator13(Generator):
     cluster: int = 13
-    question_template: str = "{date}日，{target}最大的前{rankzh}家上市公司的股票代码是什么？按成交金额从大到小给出"
-    # A股和港股都有数据，不确定问题在问哪个，决定两个都查然后UNION起来。评价指标以召回率为主，这样做ok
-    # 但发现港股有不少同一股票使用不同的股票代码，除了代码以外，其它字段完全一样，导致港股前三往往实际是同一只股票
+    question_template: str = "{date}日，{target}最大的前{rankzh}家上市公司的股票代码是什么？按{target}从大到小给出"
+    # 不考虑港股
     sql_template: str = """
-    WITH t1 AS (
-        SELECT 'A股' AS 市场, 股票代码, [{column}]
-        FROM A股票日行情表
-        WHERE 交易日 = '{date}'
-        ORDER BY [{column}] DESC
-        LIMIT {rank}
-    ),
-    t2 AS (
-        SELECT '港股' AS 市场, 股票代码, [{column}]
-        FROM 港股票日行情表
-        WHERE 交易日 = '{date}'
-        ORDER BY [{column}] DESC
-        LIMIT {rank}
-    )
-    SELECT 市场, 股票代码
-    FROM (
-        SELECT * FROM t1
-        UNION
-        SELECT * FROM t2
-    )
-    ORDER BY 市场 ASC, [{column}] DESC;
+    SELECT 股票代码
+    FROM A股票日行情表
+    WHERE 交易日 = '{date}'
+    ORDER BY [{column}] DESC
+    LIMIT {rank};
     """
-    answer_template: str = "{date}日，{target}最大的前{rankzh}家上市公司的股票代码按成交金额从大到小依次是{result}。"
-    verification_score: float = None  # 满分
+    answer_template: str = "{date}日，{target}最大的前{rankzh}家上市公司的股票代码按{target}从大到小依次是{result}。"
+    verification_score: float = 1.63  # 满分1.67
 
     def preprocess_params(self, date=None, target=None, rankzh=None):
         target_to_column = {
@@ -679,7 +646,6 @@ class Generator13(Generator):
         return None
 
 
-# TODO verify
 @dataclass
 class Generator14a(Generator):
     cluster: int = 14
@@ -693,7 +659,7 @@ class Generator14a(Generator):
     LIMIT 1;
     """
     answer_template: str = "{date}日，{name}基金的管理人是{管理人}，累计单位净值是{累计单位净值}元。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.66  # 满分1.67
 
     def preprocess_params(self, date=None, name=None):
         table1 = "基金基本信息"
@@ -705,7 +671,6 @@ class Generator14a(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator14b(Generator):
     cluster: int = 14
@@ -719,7 +684,7 @@ class Generator14b(Generator):
     LIMIT 1;
     """
     answer_template: str = "{date}日，{name}基金的管理人是{管理人}，单位净值是{单位净值:.2f}元。"
-    verification_score: float = None  # 满分
+    verification_score: float = 0.50  # 满分0.5
 
     def preprocess_params(self, date=None, name=None):
         table1 = "基金基本信息"
@@ -731,7 +696,6 @@ class Generator14b(Generator):
         )
 
 
-# TODO verify 看要不要统一拉到小数点后两位（现在1、2、3位的都有）
 @dataclass
 class Generator15(Generator):
     cluster: int = 15
@@ -746,7 +710,7 @@ class Generator15(Generator):
     LIMIT 1;
     """
     answer_template: str = "{manager}在{year}年成立并且托管人为{trustee}的所有基金的基金{column}的平均数是{result}%。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.65  # 满分1.67
 
     def preprocess_params(self, manager=None, year=None, trustee=None, column=None):
         columns = ["管理费率", "托管费率"]
@@ -760,13 +724,12 @@ class Generator15(Generator):
         )
 
     def postprocess_result(self, result, params):
-        # AVG一定返回一行记录（但值有可能是None）
+        # AVG一定返回一行记录，但值有可能是None
         column = params["column"]
         result = result[0][f"平均{column}"]
         return None if result is None else dict(result=result)
 
 
-# TODO verify
 @dataclass
 class Generator16(Generator):
     cluster: int = 16
@@ -785,7 +748,7 @@ class Generator16(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}的{report}中，个人投资者持有基金份额{compare}机构投资者持有基金份额的基金属于{category}类型的有{数量}个。"
-    verification_score: float = None  # 满分
+    verification_score: float = 2.00  # 满分2.0
 
     def preprocess_params(self, year=None, report=None, compare=None, category=None):
         compare_to_sign = {
@@ -805,7 +768,6 @@ class Generator16(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator17(Generator):
     cluster: int = 17
@@ -819,7 +781,7 @@ class Generator17(Generator):
     LIMIT 1;
     """
     answer_template: str = "股票{code}在{standard}行业分类下的{level}行业是{result}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 3.16  # 满分3.33，应该是语义分缺失
 
     def preprocess_params(self, code=None, standard=None, level=None):
         levels = ["一级", "二级"]
@@ -840,7 +802,6 @@ class Generator17(Generator):
         return None
 
 
-# TODO verify
 @dataclass
 class Generator18(Generator):
     cluster: int = 18
@@ -855,7 +816,7 @@ class Generator18(Generator):
     LIMIT {rank};
     """
     answer_template: str = "{name}基金在{date}的{report}里，前{rankzh}大持仓占比的债券名称是{result}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 3.27  # 满分3.33
 
     def preprocess_params(self, name=None, date=None, report=None, rankzh=None):
         rankzh = rankzh or choice_from_dict(rankzh_to_rank)
@@ -877,7 +838,6 @@ class Generator18(Generator):
         return None
 
 
-# TODO verify
 @dataclass
 class Generator19(Generator):
     cluster: int = 19
@@ -891,7 +851,7 @@ class Generator19(Generator):
     LIMIT 1;
     """
     answer_template: str = "{manager}20{shortyear}年成立了{数量}只基金。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.64  # 满分1.67
 
     def preprocess_params(self, manager=None, shortyear=None):
         table = "基金基本信息"
@@ -902,7 +862,6 @@ class Generator19(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator20(Generator):
     cluster: int = 20
@@ -927,7 +886,7 @@ class Generator20(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年，{manager}已发行的基金中，有{数量}只基金报告期期初基金总份额{compare}报告期期末基金总份额。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.67  # 满分1.67
 
     def preprocess_params(self, year=None, manager=None, compare=None):
         compare_to_sign = {
@@ -945,7 +904,6 @@ class Generator20(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator21(Generator):
     cluster: int = 21
@@ -966,8 +924,11 @@ class Generator21(Generator):
     FROM t1
     LIMIT 1;
     """
-    answer_template: str = "在{year}年的{report}里，{manager}管理的基金中，有{比例:.2f}%的基金是个人投资者持有的份额{compare}机构投资者。"
-    verification_score: float = None  # 满分
+    answer_template: str = "在{year}年的{report}里，{manager}管理的基金中，有{result:.2f}%的基金是个人投资者持有的份额{compare}机构投资者。"
+    # 将answer_template的{result:.2f}改为{result}，id=30/167/522/913的答案发生变化，分数降至0.90，说明这4题本来有1题答案就是错的
+    # 分析发现id=522存在个人/机构的份额都为0的数据，以为这是原因，于是添加 个人投资者持有的基金份额 + 机构投资者持有的基金份额 > 0 的条件，
+    #   id=522/673的答案发生变化，分数降至1.00，说明debug思路不对，而且这两题的答案本来是对的
+    verification_score: float = 1.21  # 满分1.67，纯答案0.80，可能是有脏数据导致某些题查询结果不准确
 
     def preprocess_params(self, year=None, report=None, manager=None, compare=None):
         compare_to_sign = {
@@ -986,8 +947,12 @@ class Generator21(Generator):
             sign=compare_to_sign[compare]
         )
 
+    def postprocess_result(self, result, params):
+        # SUM一定返回一行记录，但值有可能是None
+        result = result[0]["比例"]
+        return None if result is None else dict(result=result)
 
-# TODO verify 先只考虑A股
+
 @dataclass
 class Generator22(Generator):
     cluster: int = 22
@@ -1009,7 +974,7 @@ class Generator22(Generator):
     LIMIT 1;
     """
     answer_template: str = "{date}日，{target1}较上一交易日{target2}高的股票有{数量}只。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.67  # 满分1.67
 
     def preprocess_params(self, date=None, target1=None, target2=None):
         target_to_column = {
@@ -1031,7 +996,6 @@ class Generator22(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator23(Generator):
     cluster: int = 23
@@ -1045,7 +1009,7 @@ class Generator23(Generator):
     LIMIT 1;
     """
     answer_template: str = "{manager}20{shortyear}年成立的{category}基金,其{column}的平均值是{result:.2f}%。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.61  # 满分1.67
 
     def preprocess_params(self, manager=None, shortyear=None, category=None, column=None):
         columns = ["管理费率", "托管费率"]
@@ -1059,7 +1023,7 @@ class Generator23(Generator):
         )
 
     def postprocess_result(self, result, params):
-        # AVG一定返回一行记录（但值有可能是None）
+        # AVG一定返回一行记录，但值有可能是None
         column = params["column"]
         result = result[0][f"平均{column}"]
         return None if result is None else dict(result=result)

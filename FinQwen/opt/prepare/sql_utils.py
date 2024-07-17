@@ -25,10 +25,14 @@ class Record(NamedTuple):
     result: List[Dict[str, Union[str, int]]]
     answer: str
 
-    def print(self, *fields):
+    def print(self, *fields, expand_sql=False, end="\n"):
         fields = fields or self._fields
         for field in fields:
-            print(f"{field}={repr(self.__getattribute__(field))}")
+            if field == "sql" and expand_sql:
+                quote = '"""'
+                print(f"sql={quote}\n{self.sql}\n{quote}", end=end)
+            else:
+                print(f"{field}={repr(self.__getattribute__(field))}", end=end)
 
 
 class Manager:
@@ -132,10 +136,10 @@ class Generator:
 
             self.cluster_df["答案"] = [record.answer for record in self._records]
 
-    def print_records(self, *fields):
-        for record in self.records:
-            record.print(*fields)
-            print()
+    def print_records(self, *fields, expand_sql=False, end="\n"):
+        for index, record in enumerate(self.records):
+            print(f"\n[{index=}]")
+            record.print(*fields, expand_sql=expand_sql, end=end)
 
     def export(self):
         self.refresh_records()
