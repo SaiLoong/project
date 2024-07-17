@@ -219,22 +219,14 @@ class Generator4(Generator):
     cluster: int = 4
     question_template: str = "我想知道{name}基金在{date}的{report}中，其可转债持仓占比最大的是哪个行业？用{standard}一级行业来统计。"
     sql_template: str = """
-    WITH t1 AS (
-        SELECT 对应股票代码, 市值
-        FROM 基金可转债持仓明细
-        WHERE 基金简称 = '{name}'
-        AND 持仓日期 = '{date}'
-        AND 报告类型 = '{report}'
-    ),
-    t2 AS (
-        SELECT 股票代码, 一级行业名称
-        FROM A股公司行业划分表
-        WHERE 行业划分标准 = '{standard}行业分类'
-        AND 交易日期 = '{date}'
-    )
     SELECT 一级行业名称
-    FROM t1 JOIN t2
+    FROM 基金可转债持仓明细 t1 JOIN A股公司行业划分表 t2
     ON t1.对应股票代码 = t2.股票代码
+    AND t1.持仓日期 = t2.交易日期
+    AND t1.基金简称 = '{name}'
+    AND t1.持仓日期 = '{date}'
+    AND t1.报告类型 = '{report}'
+    AND t2.行业划分标准 = '{standard}行业分类'
     GROUP BY 一级行业名称
     ORDER BY SUM(市值) DESC
     LIMIT 1;
@@ -305,24 +297,36 @@ class Generator6(Generator):
         )
 
 
+# TODO verify 新写法有两题变化！！！
 @dataclass
 class Generator7a(Generator):
     cluster: int = 7
     question_template: str = "{date}日，一级行业为{industry1}的股票的{target}合计是多少？取整。"
     # 问题没有明确是中信还是申万标准，有的一级行业只有一边有，有的两边都有
     # A股票日行情表 里，股票代码 + 交易日 是唯一的
+    # sql_template: str = """
+    # SELECT CAST(SUM([{column}]) AS INTEGER) AS {target}合计
+    # FROM A股票日行情表
+    # WHERE 交易日 = '{date}'
+    # AND 股票代码 IN (
+    #     SELECT 股票代码
+    #     FROM A股公司行业划分表
+    #     WHERE 交易日期 = '{date}'
+    #     AND 一级行业名称 = '{industry1}'
+    # )
+    # LIMIT 1;
+    # """
+
     sql_template: str = """
     SELECT CAST(SUM([{column}]) AS INTEGER) AS {target}合计
-    FROM A股票日行情表
-    WHERE 交易日 = '{date}'
-    AND 股票代码 IN (
-        SELECT 股票代码
-        FROM A股公司行业划分表
-        WHERE 交易日期 = '{date}'
-        AND 一级行业名称 = '{industry1}'
-    )
+    FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = t2.交易日期
+    AND t1.交易日 = '{date}'
+    AND t2.一级行业名称 = '{industry1}'
     LIMIT 1;
     """
+
     answer_template: str = "{date}日，一级行业为{industry1}的股票的{target}合计是{result}。"
     verification_score: float = 2.92  # 满分3.17。可能是中信/申万标准的问题
 
@@ -386,20 +390,14 @@ class Generator8(Generator):
     cluster: int = 8
     question_template: str = "请帮我计算，在{date}，{standard}行业分类划分的一级行业为{industry1}行业中，涨跌幅最大股票的股票代码是？涨跌幅是多少？百分数保留两位小数。股票涨跌幅定义为：（收盘价 - 前一日收盘价 / 前一日收盘价）* 100%。"
     sql_template: str = """
-    SELECT 股票代码, ROUND(涨跌幅0 * 100, 2) AS 涨跌幅
-    FROM (
-        SELECT 股票代码, ([收盘价(元)] / [昨收盘(元)] - 1) AS 涨跌幅0
-        FROM A股票日行情表
-        WHERE 股票代码 IN (
-            SELECT 股票代码
-            FROM A股公司行业划分表
-            WHERE 交易日期 = '{date}'
-            AND 行业划分标准 = '{standard}行业分类'
-            AND 一级行业名称 = '{industry1}'
-        )
-        AND 交易日 = '{date}'
-        ORDER BY 涨跌幅0 DESC
-    )
+    SELECT t1.股票代码, ROUND((t1.[收盘价(元)] / t1.[昨收盘(元)] - 1) * 100, 2) AS 涨跌幅
+    FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = t2.交易日期
+    AND t1.交易日 = '{date}'
+    AND t2.行业划分标准 = '{standard}行业分类'
+    AND t2.一级行业名称 = '{industry1}'
+    ORDER BY 涨跌幅 DESC
     LIMIT 1;
     """
     answer_template: str = "在{date}，{standard}行业分类划分的一级行业为{industry1}行业中，涨跌幅最大股票的股票代码是{股票代码}，涨跌幅是{涨跌幅:.2f}%。"
@@ -482,6 +480,7 @@ class Generator11(Generator):
     question_template: str = "我想了解{name}基金,在{year}年{season}的季报第{rank}大重股。该持仓股票当个季度的涨跌幅?请四舍五入保留百分比到小数点两位。"
     # t1表包含目标股票在目标季度内的所有数据，分别找到最早的昨收价和最晚的收盘价（不一定在季度第一天和最后一天）存到t2、t3表
     # 最后就能算季度的涨跌幅了（join左右子表都只有1条数据，因此不用写on）
+    # 试过把t1内部写成JOIN ON形式，答案是一样的
     sql_template: str = """
     WITH t1 AS (
         SELECT *
@@ -544,6 +543,7 @@ class Generator12(Generator):
     # 问题11的加强版，从计算一个股票改为计算多个股票
     # t2、t3还可以用 RANK() OVER (PARTITION BY 股票代码 ORDER BY 交易日 ASC) 的方式排序然后选择第1个，更通用
     # 由于t2、t3有“GROUP BY 股票代码”，因此最后的股票代码一定是唯一的，不加DISTINCT
+    # 试过把t1内部写成JOIN ON形式，答案是一样的
     sql_template: str = """
     WITH t1 AS (
         SELECT *
@@ -1059,6 +1059,264 @@ class Generator24(Generator):
         # SUM一定返回一行记录，但值有可能是None
         result = result[0]
         return None if result["持有份额"] is None else result
+
+
+# TODO verify
+@dataclass
+class Generator25(Generator):
+    cluster: int = 25
+    question_template: str = "请查询：{year}年{month}月{report},持有{name}且是前{rank}大重仓股的基金有几个？"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM 基金债券持仓明细
+    WHERE 持仓日期 = '{year}{monthday}'
+    AND 报告类型 = '{report}'
+    AND 债券名称 = '{name}'
+    AND 第N大重仓股 <= {rank}
+    LIMIT 1;
+    """
+    answer_template: str = "{year}年{month}月{report},持有{name}且是前{rank}大重仓股的基金有{数量}个。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, month=None, report=None, name=None, rank=None):
+        month_to_monthday = {
+            "3": "0331",
+            "6": "0630",
+            "9": "0930",
+            "12": "1231"
+        }
+        month = str(month or choice_from_dict(month_to_monthday))
+        table = "基金债券持仓明细"
+
+        return dict(
+            year=year or choice(years),
+            month=month,
+            report=report or choice_from_column(table, "报告类型"),
+            name=name or choice_from_column(table, "债券名称"),
+            rank=rank or randint(1, 10),
+            monthday=month_to_monthday[month]
+        )
+
+
+# TODO verify
+@dataclass
+class Generator26(Generator):
+    cluster: int = 26
+    question_template: str = "请查询在{year}年度，{code}股票涨停天数？   解释：（收盘价/昨日收盘价-1）》=9.8% 视作涨停"
+    sql_template: str = """
+    SELECT COUNT(*) AS 天数
+    FROM A股票日行情表
+    WHERE 交易日 LIKE '{year}%'
+    AND 股票代码 = '{code}'
+    AND ([收盘价(元)] / [昨收盘(元)] - 1) >= 0.098
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年度，{code}股票涨停天数是{天数}天。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, code=None):
+        table = "A股票日行情表"
+
+        return dict(
+            year=year or choice(years),
+            code=code or choice_from_column(table, "股票代码")
+        )
+
+
+# TODO verify
+@dataclass
+class Generator27(Generator):
+    cluster: int = 27
+    question_template: str = "请查询在{date}日期，{standard}行业分类下{industry1}一级行业中，当日收盘价波动最大（即最高价与最低价之差最大）的股票代码是什么？"
+    sql_template: str = """
+    SELECT t1.股票代码
+    FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = t2.交易日期
+    AND t1.交易日 = '{date}'
+    AND t2.行业划分标准 = '{standard}行业分类'
+    AND t2.一级行业名称 = '{industry1}'
+    ORDER BY t1.[最高价(元)] - t1.[最低价(元)] DESC
+    LIMIT 1;
+    """
+    answer_template: str = "在{date}日期，{standard}行业分类下{industry1}一级行业中，当日收盘价波动最大的股票代码是{股票代码}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, standard=None, industry1=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            date=date or choice_from_column(table, "交易日期"),
+            standard=standard or choice(standards),
+            industry1=industry1 or choice_from_column(table, "一级行业名称")
+        )
+
+
+# TODO verify 跑一次比较久，可直接用已生成的文件
+@dataclass
+class Generator28a(Generator):
+    cluster: int = 28
+    question_template: str = "假设股票日收益率计算公式为：日收益率 = （当日收盘价-昨收盘价）/昨收盘价。请帮我找到在{year}年，{standard}行业分类行业划分标准,{industry1}一级行业中, 代码为多少的股票的日均收益率最高？"
+    # 10条问题4进程需要跑6:15
+    sql_template: str = """
+    SELECT t1.股票代码
+    FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = t2.交易日期
+    AND t1.交易日 LIKE '{year}%'
+    AND t2.行业划分标准 = '{standard}行业分类'
+    AND t2.一级行业名称 = '{industry1}'
+    GROUP BY t1.股票代码
+    ORDER BY AVG(t1.[收盘价(元)] / t1.[昨收盘(元)] - 1) DESC
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年，{standard}行业分类行业划分标准,{industry1}一级行业中, 代码为{股票代码}的股票的日均收益率最高。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, standard=None, industry1=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            year=year or choice(years),
+            standard=standard or choice(standards),
+            industry1=industry1 or choice_from_column(table, "一级行业名称")
+        )
+
+
+# TODO verify 跑一次比较久，可直接用已生成的文件
+@dataclass
+class Generator28b(Generator):
+    cluster: int = 28
+    question_template: str = "假定股票'日波动值'计算公式为：'日波动值' = 日最高价-日最低价。请帮我查询下在{year}年，{standard}行业分类行业划分标准,{industry1}一级行业中，股票日均波动值最小的股票对应的股票代码是？"
+    # 1条问题需要跑4:28
+    sql_template: str = """
+    SELECT t1.股票代码
+    FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = t2.交易日期
+    AND t1.交易日 LIKE '{year}%'
+    AND t2.行业划分标准 = '{standard}行业分类'
+    AND t2.一级行业名称 = '{industry1}'
+    GROUP BY t1.股票代码
+    ORDER BY AVG(t1.[最高价(元)] - t1.[最低价(元)]) ASC
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年，{standard}行业分类行业划分标准,{industry1}一级行业中，股票日均波动值最小的股票对应的股票代码是{股票代码}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, standard=None, industry1=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            year=year or choice(years),
+            standard=standard or choice(standards),
+            industry1=industry1 or choice_from_column(table, "一级行业名称")
+        )
+
+
+# TODO verify 基金股票持仓明细没有指定报告类型，导致有两份数据，结果可能有问题；小数点先统一为3位
+@dataclass
+class Generator29(Generator):
+    cluster: int = 29
+    question_template: str = "帮我查询在{year}年12月31日，代码为{code}的基金前{rank}大重仓股票中属于{standard}二级{industry2}行业的平均市值是多少？小数点后保留不超过3位。"
+    sql_template: str = """
+    SELECT ROUND(AVG(市值), 3) AS 平均市值
+    FROM 基金股票持仓明细 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.持仓日期 = t2.交易日期
+    AND t1.持仓日期 = '{year}1231'
+    AND t1.基金代码 = '{code}'
+    AND t1.第N大重仓股 <= {rank}
+    AND t2.行业划分标准 = '{standard}行业分类'
+    AND t2.二级行业名称 = '{industry2}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年12月31日，代码为{code}的基金前{rank}大重仓股票中属于{standard}二级{industry2}行业的平均市值是{平均市值:.3f}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, code=None, rank=None, standard=None, industry2=None):
+        table1 = "基金股票持仓明细"
+        table2 = "A股公司行业划分表"
+
+        return dict(
+            year=year or choice(years),
+            code=code or choice_from_column(table1, "基金代码"),
+            rank=rank or randint(1, 20),
+            standard=standard or choice(standards),
+            industry2=industry2 or choice_from_column(table2, "二级行业名称")
+        )
+
+    def postprocess_result(self, result, params):
+        # AVG一定返回一行记录，但值有可能是None
+        result = result[0]
+        return None if result["平均市值"] is None else result
+
+
+# TODO verify
+@dataclass
+class Generator30(Generator):
+    cluster: int = 30
+    question_template: str = "{year}年{report}里，{manager}管理的基金中，机构投资者持有份额比个人投资者{compare}的基金有多少只?"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM 基金份额持有人结构
+    WHERE 基金代码 IN (
+        SELECT 基金代码
+        FROM 基金基本信息
+        WHERE 管理人 = '{manager}'
+    )
+    AND 定期报告所属年度 = {year}
+    AND 报告类型 = '{report}'
+    AND 机构投资者持有的基金份额 {sign} 个人投资者持有的基金份额
+    LIMIT 1;
+    """
+    answer_template: str = "{year}年{report}里，{manager}管理的基金中，机构投资者持有份额比个人投资者{compare}的基金有{数量}只。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, report=None, manager=None, compare=None):
+        compare_to_sign = {
+            "多": ">",
+            "少": "<"
+        }
+        compare = compare or choice_from_dict(compare_to_sign)
+        table1 = "基金份额持有人结构"
+        table2 = "基金基本信息"
+
+        return dict(
+            year=year or choice(years),
+            report=report or choice_from_column(table1, "报告类型"),
+            manager=manager or choice_from_column(table2, "管理人"),
+            compare=compare,
+            sign=compare_to_sign[compare]
+        )
+
+
+# TODO verify 题目没限定standard，股票数可能会重复，看要不要加distinct
+@dataclass
+class Generator31(Generator):
+    cluster: int = 31
+    question_template: str = "请帮我查询出{date}日，{industry1}一级行业涨幅超过{percent}%（不包含）的股票数量。"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = t2.交易日期
+    AND t1.交易日 = '{date}'
+    AND t2.一级行业名称 = '{industry1}'
+    AND (t1.[收盘价(元)] / t1.[昨收盘(元)] - 1) * 100 > {percent}
+    LIMIT 1;
+    """
+    answer_template: str = "{date}日，{industry1}一级行业涨幅超过{percent}%（不包含）的股票数量是{数量}只。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, industry1=None, percent=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            date=date or choice_from_column(table, "交易日期"),
+            industry1=industry1 or choice_from_column(table, "一级行业名称"),
+            percent=percent or randint(1, 10)
+        )
 
 
 # ====================================================================
