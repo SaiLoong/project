@@ -36,6 +36,9 @@ class Record(NamedTuple):
             else:
                 print(f"{field} = {repr(self.__getattribute__(field))}", end=end)
 
+    def pretty_print(self, *fields):
+        self.print(*fields, expand_sql=True, endl=2)
+
 
 class Manager:
     generators = defaultdict(dict)

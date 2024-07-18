@@ -199,8 +199,6 @@ class Generator3b(Generator):
             "Q4": "1231"
         }
         season = season or choice_from_dict(season_to_monthday)
-        monthday = season_to_monthday[season]
-
         rankzh = rankzh or choice_from_dict(rankzh_to_rank)
         table = "基金可转债持仓明细"
 
@@ -209,7 +207,7 @@ class Generator3b(Generator):
             season=season,
             code=code or choice_from_column(table, "基金代码"),
             rankzh=rankzh,
-            monthday=monthday,
+            monthday=season_to_monthday[season],
             rank=rankzh_to_rank[rankzh]
         )
 
@@ -297,26 +295,11 @@ class Generator6(Generator):
         )
 
 
-# TODO verify 新写法有两题变化！！！
 @dataclass
 class Generator7a(Generator):
     cluster: int = 7
     question_template: str = "{date}日，一级行业为{industry1}的股票的{target}合计是多少？取整。"
-    # 问题没有明确是中信还是申万标准，有的一级行业只有一边有，有的两边都有
-    # A股票日行情表 里，股票代码 + 交易日 是唯一的
-    # sql_template: str = """
-    # SELECT CAST(SUM([{column}]) AS INTEGER) AS {target}合计
-    # FROM A股票日行情表
-    # WHERE 交易日 = '{date}'
-    # AND 股票代码 IN (
-    #     SELECT 股票代码
-    #     FROM A股公司行业划分表
-    #     WHERE 交易日期 = '{date}'
-    #     AND 一级行业名称 = '{industry1}'
-    # )
-    # LIMIT 1;
-    # """
-
+    # 其实sql是有问题的，由于问题没有明确是哪个行业标准，因此大部分数据都重复两次了，但是标准答案就这么写
     sql_template: str = """
     SELECT CAST(SUM([{column}]) AS INTEGER) AS {target}合计
     FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
@@ -326,9 +309,8 @@ class Generator7a(Generator):
     AND t2.一级行业名称 = '{industry1}'
     LIMIT 1;
     """
-
     answer_template: str = "{date}日，一级行业为{industry1}的股票的{target}合计是{result}。"
-    verification_score: float = 2.92  # 满分3.17。可能是中信/申万标准的问题
+    verification_score: float = 3.14  # 满分3.17
 
     def preprocess_params(self, date=None, industry1=None, target=None):
         target_to_column = {
@@ -1061,7 +1043,6 @@ class Generator24(Generator):
         return None if result["持有份额"] is None else result
 
 
-# TODO verify
 @dataclass
 class Generator25(Generator):
     cluster: int = 25
@@ -1076,7 +1057,7 @@ class Generator25(Generator):
     LIMIT 1;
     """
     answer_template: str = "{year}年{month}月{report},持有{name}且是前{rank}大重仓股的基金有{数量}个。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.82  # 满分1.83
 
     def preprocess_params(self, year=None, month=None, report=None, name=None, rank=None):
         month_to_monthday = {
@@ -1098,7 +1079,6 @@ class Generator25(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator26(Generator):
     cluster: int = 26
@@ -1112,7 +1092,7 @@ class Generator26(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年度，{code}股票涨停天数是{天数}天。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.63  # 满分1.67
 
     def preprocess_params(self, year=None, code=None):
         table = "A股票日行情表"
@@ -1123,7 +1103,6 @@ class Generator26(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator27(Generator):
     cluster: int = 27
@@ -1140,7 +1119,7 @@ class Generator27(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{date}日期，{standard}行业分类下{industry1}一级行业中，当日收盘价波动最大的股票代码是{股票代码}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.63  # 满分1.67
 
     def preprocess_params(self, date=None, standard=None, industry1=None):
         table = "A股公司行业划分表"
@@ -1152,7 +1131,6 @@ class Generator27(Generator):
         )
 
 
-# TODO verify 跑一次比较久，可直接用已生成的文件
 @dataclass
 class Generator28a(Generator):
     cluster: int = 28
@@ -1171,7 +1149,7 @@ class Generator28a(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年，{standard}行业分类行业划分标准,{industry1}一级行业中, 代码为{股票代码}的股票的日均收益率最高。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.56  # 满分1.67，可能错了1题
 
     def preprocess_params(self, year=None, standard=None, industry1=None):
         table = "A股公司行业划分表"
@@ -1183,7 +1161,6 @@ class Generator28a(Generator):
         )
 
 
-# TODO verify 跑一次比较久，可直接用已生成的文件
 @dataclass
 class Generator28b(Generator):
     cluster: int = 28
@@ -1202,7 +1179,7 @@ class Generator28b(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年，{standard}行业分类行业划分标准,{industry1}一级行业中，股票日均波动值最小的股票对应的股票代码是{股票代码}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 0.06  # 满分0.17，也就是说唯一的1题错了。看不出问题+只有1题+执行太慢，算了
 
     def preprocess_params(self, year=None, standard=None, industry1=None):
         table = "A股公司行业划分表"
@@ -1214,7 +1191,6 @@ class Generator28b(Generator):
         )
 
 
-# TODO verify 基金股票持仓明细没有指定报告类型，导致有两份数据，结果可能有问题；小数点先统一为3位
 @dataclass
 class Generator29(Generator):
     cluster: int = 29
@@ -1232,7 +1208,7 @@ class Generator29(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年12月31日，代码为{code}的基金前{rank}大重仓股票中属于{standard}二级{industry2}行业的平均市值是{平均市值:.3f}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.49  # 满分1.5
 
     def preprocess_params(self, year=None, code=None, rank=None, standard=None, industry2=None):
         table1 = "基金股票持仓明细"
@@ -1252,7 +1228,6 @@ class Generator29(Generator):
         return None if result["平均市值"] is None else result
 
 
-# TODO verify
 @dataclass
 class Generator30(Generator):
     cluster: int = 30
@@ -1271,7 +1246,7 @@ class Generator30(Generator):
     LIMIT 1;
     """
     answer_template: str = "{year}年{report}里，{manager}管理的基金中，机构投资者持有份额比个人投资者{compare}的基金有{数量}只。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.60  # 满分1.67
 
     def preprocess_params(self, year=None, report=None, manager=None, compare=None):
         compare_to_sign = {
@@ -1291,13 +1266,12 @@ class Generator30(Generator):
         )
 
 
-# TODO verify 题目没限定standard，股票数可能会重复，看要不要加distinct
 @dataclass
 class Generator31(Generator):
     cluster: int = 31
     question_template: str = "请帮我查询出{date}日，{industry1}一级行业涨幅超过{percent}%（不包含）的股票数量。"
     sql_template: str = """
-    SELECT COUNT(*) AS 数量
+    SELECT COUNT(DISTINCT(t1.股票代码)) AS 数量
     FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
     ON t1.股票代码 = t2.股票代码
     AND t1.交易日 = t2.交易日期
@@ -1307,7 +1281,7 @@ class Generator31(Generator):
     LIMIT 1;
     """
     answer_template: str = "{date}日，{industry1}一级行业涨幅超过{percent}%（不包含）的股票数量是{数量}只。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.67  # 满分1.67，不加DISTINCT 1.44
 
     def preprocess_params(self, date=None, industry1=None, percent=None):
         table = "A股公司行业划分表"
@@ -1317,6 +1291,260 @@ class Generator31(Generator):
             industry1=industry1 or choice_from_column(table, "一级行业名称"),
             percent=percent or randint(1, 10)
         )
+
+
+@dataclass
+class Generator32(Generator):
+    cluster: int = 32
+    question_template: str = "请帮我查询在{year}年,{manager}成立哪种类型的基金个数最多?"
+    sql_template: str = """
+    SELECT 基金类型
+    FROM 基金基本信息
+    WHERE 成立日期 LIKE '{year}%'
+    AND 管理人 = '{manager}'
+    GROUP BY 基金类型
+    ORDER BY COUNT(*) DESC
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年,{manager}成立{基金类型}的基金个数最多。"
+    verification_score: float = 1.63  # 满分1.67
+
+    def preprocess_params(self, year=None, manager=None):
+        table = "基金基本信息"
+
+        return dict(
+            year=year or choice(years),
+            manager=manager or choice_from_column(table, "管理人")
+        )
+
+
+@dataclass
+class Generator33(Generator):
+    cluster: int = 33
+    question_template: str = "{year}年{season}季度，有多少家基金发生了净赎回?总共赎回了多少份额?记得给我四舍五入到小数点后两位哦。"
+    # 不要用 报告期基金总赎回份额 - 报告期基金总申购份额，这两个值可能等于0.0，不准
+    sql_template: str = """
+    WITH t1 AS (
+        SELECT *, 报告期期初基金总份额 - 报告期期末基金总份额 AS 净赎回
+        FROM 基金规模变动表
+        WHERE 截止日期 LIKE '{year}-{monthday}%'
+    )
+    SELECT COUNT(*) AS 数量, ROUND(SUM(净赎回), 2) AS 净赎回份额
+    FROM t1
+    WHERE 净赎回 > 0
+    LIMIT 1;
+    """
+    answer_template: str = "{year}年{season}季度，有{数量}家基金发生了净赎回，总共赎回了{净赎回份额:.2f}份额。"
+    verification_score: float = 1.94  # 满分2.0
+
+    def preprocess_params(self, year=None, season=None):
+        season_to_monthday = {
+            "一": "03-31",
+            "二": "06-30",
+            "三": "09-30",
+            "四": "12-31"
+        }
+        season = season or choice_from_dict(season_to_monthday)
+
+        return dict(
+            year=year or choice(years),
+            season=season,
+            monthday=season_to_monthday[season]
+        )
+
+    def postprocess_result(self, result, params):
+        # SUM一定返回一行记录，但值有可能是None
+        result = result[0]
+        return None if result["净赎回份额"] is None else result
+
+
+@dataclass
+class Generator34(Generator):
+    cluster: int = 34
+    question_template: str = "请问{year}年{season}季度有多少家基金是净申购?它们的净申购份额加起来是多少?请四舍五入保留小数点两位。"
+    sql_template: str = """
+    WITH t1 AS (
+        SELECT *, 报告期期末基金总份额 - 报告期期初基金总份额 AS 净申购
+        FROM 基金规模变动表
+        WHERE 截止日期 LIKE '{year}-{monthday}%'
+    )
+    SELECT COUNT(*) AS 数量, ROUND(SUM(净申购), 2) AS 净申购份额
+    FROM t1
+    WHERE 净申购 > 0
+    LIMIT 1;
+    """
+    answer_template: str = "{year}年{season}季度有{数量}家基金是净申购，它们的净申购份额加起来是{净申购份额:.2f}份。"
+    verification_score: float = 1.57  # 满分1.67，不确定是错了1题还是语义误差
+
+    def preprocess_params(self, year=None, season=None):
+        season_to_monthday = {
+            "一": "03-31",
+            "二": "06-30",
+            "三": "09-30",
+            "四": "12-31"
+        }
+        season = season or choice_from_dict(season_to_monthday)
+
+        return dict(
+            year=year or choice(years),
+            season=season,
+            monthday=season_to_monthday[season]
+        )
+
+    def postprocess_result(self, result, params):
+        # SUM一定返回一行记录，但值有可能是None
+        result = result[0]
+        return None if result["净申购份额"] is None else result
+
+
+@dataclass
+class Generator35a(Generator):
+    cluster: int = 35
+    question_template: str = "请帮我查询下在{year}年, {manager}管理的债券型基金中，持有过{category}的基金有多少只？"
+    # 基金基本信息 理应加上 基金类型 = '债券型' 的限制，否则把混合型基金也纳入考虑了。但是答案是这样写的（加了反而只有1.07分）
+    sql_template: str = """
+    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    FROM 基金债券持仓明细
+    WHERE 基金代码 IN (
+        SELECT 基金代码
+        FROM 基金基本信息
+        WHERE 管理人 = '{manager}'
+    )
+    AND 持仓日期 LIKE '{year}%'
+    AND 债券类型 = '{category}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年, {manager}管理的债券型基金中，持有过{category}的基金有{数量}只。"
+    verification_score: float = 1.50  # 满分1.5
+
+    def preprocess_params(self, year=None, manager=None, category=None):
+        table1 = "基金基本信息"
+        table2 = "基金债券持仓明细"
+
+        return dict(
+            year=year or choice(years),
+            manager=manager or choice_from_column(table1, "管理人"),
+            category=category or choice_from_column(table2, "债券类型")
+        )
+
+
+@dataclass
+class Generator35b(Generator):
+    cluster: int = 35
+    question_template: str = "请帮我查询下在{year}年{manager}成立的基金中，有多少只基金持仓过{category}？"
+    sql_template: str = """
+    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    FROM 基金债券持仓明细
+    WHERE 基金代码 IN (
+        SELECT 基金代码
+        FROM 基金基本信息
+        WHERE 管理人 = '{manager}'
+    )
+    AND 持仓日期 LIKE '{year}%'
+    AND 债券类型 = '{category}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年{manager}成立的基金中，有{数量}只基金持仓过{category}。"
+    verification_score: float = 0.06  # 满分0.17，估计答案有问题，只有1题，算了
+
+    def preprocess_params(self, year=None, manager=None, category=None):
+        table1 = "基金基本信息"
+        table2 = "基金债券持仓明细"
+
+        return dict(
+            year=year or choice(years),
+            manager=manager or choice_from_column(table1, "管理人"),
+            category=category or choice_from_column(table2, "债券类型")
+        )
+
+
+@dataclass
+class Generator36(Generator):
+    cluster: int = 36
+    question_template: str = "请帮我计算，代码为{code}的股票，{year}年一年持有的年化收益率有多少？百分数请保留两位小数。年化收益率定义为：（（有记录的一年的最终收盘价-有记录的一年的年初当天开盘价）/有记录的一年的当天开盘价）* 100%。"
+    # 与问题11类似
+    sql_template: str = """
+    WITH t1 AS (
+        SELECT *
+        FROM A股票日行情表
+        WHERE 股票代码 = '{code}'
+        AND 交易日 LIKE '{year}%'
+    ),
+    t2 AS (
+        SELECT [今开盘(元)] AS 期初价
+        FROM t1
+        ORDER BY 交易日 ASC
+        LIMIT 1
+    ),
+    t3 AS (
+        SELECT [收盘价(元)] AS 期末价
+        FROM t1
+        ORDER BY 交易日 DESC
+        LIMIT 1
+    )
+    SELECT ROUND((t3.期末价 / t2.期初价 - 1) * 100, 2) AS 年化收益率
+    FROM t2 JOIN t3
+    LIMIT 1;
+    """
+    answer_template: str = "代码为{code}的股票，{year}年一年持有的年化收益率为{年化收益率:.2f}%。"
+    verification_score: float = 1.62  # 满分1.67
+
+    def preprocess_params(self, code=None, year=None):
+        table = "A股票日行情表"
+
+        return dict(
+            code=code or choice_from_column(table, "股票代码"),
+            year=year or choice(years)
+        )
+
+
+@dataclass
+class Generator37(Generator):
+    cluster: int = 37
+    question_template: str = "请帮我查询下，在{date}，{standard}行业分类里一级行业为{industry1}行业的所有股票里, {column}最多的股票的代码是什么？{target}是多少？"
+    sql_template: str = """
+    SELECT t1.股票代码, t1.[{column}]
+    FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = t2.交易日期
+    AND t1.交易日 = '{date}'
+    AND t2.行业划分标准 = '{standard}行业分类'
+    AND t2.一级行业名称 = '{industry1}'
+    ORDER BY t1.[{column}] DESC
+    LIMIT 1;
+    """
+    answer_template: str = "在{date}，{standard}行业分类里一级行业为{industry1}行业的所有股票里, {column}最多的股票的代码是{股票代码}，{target}是{result}。"
+    verification_score: float = 1.63  # 满分1.67
+
+    def preprocess_params(self, date=None, standard=None, industry1=None, column=None, target=None):
+        target_to_column = {
+            "成交量": "成交量(股)",
+            "成交金额": "成交金额(元)"
+        }
+        target = target or choice_from_dict(target_to_column)
+        if column:
+            assert column == target_to_column[target]
+        else:
+            column = target_to_column[target]
+        table = "A股公司行业划分表"
+
+        return dict(
+            date=date or choice_from_column(table, "交易日期"),
+            standard=standard or choice(standards),
+            industry1=industry1 or choice_from_column(table, "一级行业名称"),
+            column=column,
+            target=target
+        )
+
+    def postprocess_result(self, result, params):
+        if result:
+            result = result[0].copy()
+            column = params["column"]
+            target, unit = re.fullmatch(r"(.*)\((.*)\)", column).groups()
+            result["result"] = str(result.pop(column)) + unit
+            return result
+        else:
+            return None
 
 
 # ====================================================================
