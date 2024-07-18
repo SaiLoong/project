@@ -48,7 +48,8 @@ rankzh_to_rank = {
     "六": 6,
     "七": 7,
     "八": 8,
-    "九": 9
+    "九": 9,
+    "十": 10
 }
 
 
@@ -621,11 +622,7 @@ class Generator13(Generator):
         )
 
     def postprocess_result(self, result, params):
-        if result:
-            return dict(
-                result="、".join([record["股票代码"] for record in result])
-            )
-        return None
+        return dict(result="、".join([record["股票代码"] for record in result])) if result else None
 
 
 @dataclass
@@ -778,9 +775,7 @@ class Generator17(Generator):
     def postprocess_result(self, result, params):
         if result:
             level = params["level"]
-            return dict(
-                result=result[0][f"{level}行业名称"]
-            )
+            return dict(result=result[0][f"{level}行业名称"])
         return None
 
 
@@ -813,11 +808,7 @@ class Generator18(Generator):
         )
 
     def postprocess_result(self, result, params):
-        if result:
-            return dict(
-                result="、".join([record["债券名称"] for record in result])
-            )
-        return None
+        return dict(result="、".join([record["债券名称"] for record in result])) if result else None
 
 
 @dataclass
@@ -1543,8 +1534,520 @@ class Generator37(Generator):
             target, unit = re.fullmatch(r"(.*)\((.*)\)", column).groups()
             result["result"] = str(result.pop(column)) + unit
             return result
-        else:
-            return None
+        return None
+
+
+# TODO verify
+@dataclass
+class Generator38(Generator):
+    cluster: int = 38
+    question_template: str = "帮我查一下{name}基金在{date}的资产净值和单位净值是多少?"
+    sql_template: str = """
+    SELECT 资产净值, 单位净值
+    FROM 基金日行情表
+    WHERE 基金代码 = (
+        SELECT 基金代码
+        FROM 基金基本信息
+        WHERE 基金简称 = '{name}'
+        LIMIT 1
+    )
+    AND 交易日期 = '{date}'
+    LIMIT 1;
+    """
+    answer_template: str = "{name}基金在{date}的资产净值是{资产净值}元，单位净值是{单位净值}元。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, name=None, date=None):
+        table1 = "基金基本信息"
+        table2 = "基金日行情表"
+
+        return dict(
+            name=name or choice_from_column(table1, "基金简称"),
+            date=date or choice_from_column(table2, "交易日期")
+        )
+
+
+# TODO verify
+@dataclass
+class Generator39(Generator):
+    cluster: int = 39
+    question_template: str = "在{year}年{month}月季报中，持有{name}这一股票且市值占基金资产净值比不小于{percent}%的有几只基金？"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM 基金股票持仓明细
+    WHERE 持仓日期 = '{year}{monthday}'
+    AND 报告类型 = '季报'
+    AND 股票名称 = '{name}'
+    AND 市值占基金资产净值比 * 100 >= {percent}
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年{month}月季报中，持有{name}这一股票且市值占基金资产净值比不小于{percent}%的有{数量}只基金。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, month=None, name=None, percent=None):
+        month_to_monthday = {
+            "3": "0331",
+            "6": "0630",
+            "9": "0930",
+            "12": "1231"
+        }
+        month = str(month or choice_from_dict(month_to_monthday))
+        table = "基金股票持仓明细"
+
+        return dict(
+            year=year or choice(years),
+            month=month,
+            name=name or choice_from_column(table, "股票名称"),
+            percent=percent or randint(1, 10),
+            monthday=month_to_monthday[month]
+        )
+
+
+# TODO verify
+@dataclass
+class Generator40(Generator):
+    cluster: int = 40
+    question_template: str = "在{year}年{month}月{day}日，使用{standard}行业分类标准，股票代码{code}是属于哪个一级行业的?"
+    sql_template: str = """
+    SELECT 一级行业名称
+    FROM A股公司行业划分表
+    WHERE 交易日期 = '{year}{month:0>2}{day:0>2}'
+    AND 行业划分标准 = '{standard}行业分类'
+    AND 股票代码 = '{code}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年{month}月{day}日，使用{standard}行业分类标准，股票代码{code}是属于{一级行业名称}一级行业。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, month=None, day=None, standard=None, code=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            year=year or choice(years),
+            month=month or randint(1, 12),
+            day=day or randint(1, 28),
+            standard=standard or choice(standards),
+            code=code or choice_from_column(table, "股票代码")
+        )
+
+
+# TODO verify 不对的话试下去掉distinct
+@dataclass
+class Generator41a(Generator):
+    cluster: int = 41
+    question_template: str = "{date}日，{name}在多少只基金的前{rankzh}大重仓股中？"
+    # 题目没有限定报告类型，导致基金重复，因此需要加DISTINCT
+    sql_template: str = """
+    SELECT COUNT(DISTINCT(基金代码)) AS 数量
+    FROM 基金股票持仓明细
+    WHERE 持仓日期 = '{date}'
+    AND 股票名称 = '{name}'
+    AND 第N大重仓股 <= {rank}
+    LIMIT 1;
+    """
+    answer_template: str = "{date}日，{name}在{数量}只基金的前{rankzh}大重仓股中。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, name=None, rankzh=None):
+        rankzh = rankzh or choice_from_dict(rankzh_to_rank)
+        table = "基金股票持仓明细"
+
+        return dict(
+            date=date or choice_from_column(table, "持仓日期"),
+            name=name or choice_from_column(table, "股票名称"),
+            rankzh=rankzh,
+            rank=rankzh_to_rank[rankzh]
+        )
+
+
+# TODO verify 不对的话试下去掉distinct
+@dataclass
+class Generator41b(Generator):
+    cluster: int = 41
+    question_template: str = "{date}日，{industry1}一级行业有多少只A股股票？"
+    # 题目没有限制行业划分标准，导致股票重复，因此需要加DISTINCT
+    sql_template: str = """
+    SELECT COUNT(DISTINCT(股票代码)) AS 数量
+    FROM A股公司行业划分表
+    WHERE 交易日期 = '{date}'
+    AND 一级行业名称 = '{industry1}'
+    LIMIT 1;
+    """
+    answer_template: str = "{date}日，{industry1}一级行业有{数量}只A股股票。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, industry1=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            date=date or choice_from_column(table, "交易日期"),
+            industry1=industry1 or choice_from_column(table, "一级行业名称")
+        )
+
+
+# TODO verify
+@dataclass
+class Generator41c(Generator):
+    cluster: int = 41
+    question_template: str = "在{year}年报中，{name1}和{name2}分别在多少只基金的前{rank}大重仓股里？"
+    sql_template: str = """
+    SELECT 股票名称, COUNT(*) AS 数量
+    FROM 基金股票持仓明细
+    WHERE 持仓日期 = '{year}1231'
+    AND 报告类型 = '年报(含半年报)'
+    AND 股票名称 IN ('{name1}', '{name2}')
+    AND 第N大重仓股 <= {rank}
+    GROUP BY 股票名称
+    LIMIT 2;
+    """
+    answer_template: str = "在{year}年报中，{name1}在{num1}只基金的前{rank}大重仓股里，{name2}在{num2}只基金的前{rank}大重仓股里"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, name1=None, name2=None, rank=None):
+        table = "基金股票持仓明细"
+        name1 = name1 or choice_from_column(table, "股票名称")
+        name2 = name2 or choice_from_column(table, "股票名称")
+        assert name1 != name2
+
+        return dict(
+            year=year or choice(years),
+            name1=name1,
+            name2=name2,
+            rank=rank or randint(1, 10)
+        )
+
+    def postprocess_result(self, result, params):
+        nums = {record["股票名称"]: record["数量"] for record in result}
+        return dict(
+            num1=nums.get(params["name1"], 0),
+            num2=nums.get(params["name2"], 0)
+        )
+
+
+# TODO verify
+@dataclass
+class Generator42(Generator):
+    cluster: int = 42
+    question_template: str = "请问股票代码为{code}的股票在{year}年内日成交量{compare}该股票当年平均日成交量的有多少个交易日？"
+    sql_template: str = """
+    WITH t1 AS (
+        SELECT *
+        FROM A股票日行情表
+        WHERE 股票代码 = '{code}'
+        AND 交易日 LIKE '{year}%'
+    )
+    SELECT COUNT(*) AS 天数
+    FROM t1
+    WHERE [成交量(股)] {sign} (
+        SELECT AVG([成交量(股)])
+        FROM t1
+        LIMIT 1
+    )
+    LIMIT 1;
+    """
+    answer_template: str = "股票代码为{code}的股票在{year}年内日成交量{compare}该股票当年平均日成交量的有{天数}个交易日。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, code=None, year=None, compare=None):
+        compare_to_sign = {
+            "高于": ">",
+            "低于": "<"
+        }
+        compare = compare or choice_from_dict(compare_to_sign)
+        table = "A股票日行情表"
+
+        return dict(
+            code=code or choice_from_column(table, "股票代码"),
+            year=year or choice(years),
+            compare=compare,
+            sign=compare_to_sign[compare]
+        )
+
+
+# TODO verify DISTINCT 中信/申万
+@dataclass
+class Generator43(Generator):
+    cluster: int = 43
+    question_template: str = "请问在{industry1}行业，{date}行业的A股公司有多少?"
+    sql_template: str = """
+    SELECT COUNT(DISTINCT(股票代码)) AS 数量
+    FROM A股公司行业划分表
+    WHERE 一级行业名称 = '{industry1}'
+    AND 交易日期 = '{date}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{industry1}行业，{date}行业的A股公司有{数量}间。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, industry1=None, date=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            industry1=industry1 or choice_from_column(table, "一级行业名称"),
+            date=date or choice_from_column(table, "交易日期")
+        )
+
+
+# TODO verify
+@dataclass
+class Generator44(Generator):
+    cluster: int = 44
+    question_template: str = "在{date}，按照{standard}行业分类的行业划分标准，哪个一级行业的A股公司数量最多？"
+    sql_template: str = """
+    SELECT 一级行业名称
+    FROM A股公司行业划分表
+    WHERE 交易日期 = '{date}'
+    AND 行业划分标准 = '{standard}行业分类'
+    GROUP BY 一级行业名称
+    ORDER BY COUNT(*) DESC
+    LIMIT 1;
+    """
+    answer_template: str = "在{date}，按照{standard}行业分类的行业划分标准，{一级行业名称}一级行业的A股公司数量最多。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, standard=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            date=date or choice_from_column(table, "交易日期"),
+            standard=standard or choice(standards)
+        )
+
+
+# TODO verify
+@dataclass
+class Generator45(Generator):
+    cluster: int = 45
+    question_template: str = "请帮我查询在截止{date}的报告期间，基金总份额{compare}的基金数量是多少？"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM 基金规模变动表
+    WHERE 截止日期 LIKE '{date}%'
+    AND 报告期期末基金总份额 {sign} 报告期期初基金总份额
+    LIMIT 1;
+    """
+    answer_template: str = "在截止{date}的报告期间，基金总份额{compare}的基金数量是{数量}只。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, compare=None):
+        compare_to_sign = {
+            "提升": ">",
+            "降低": "<"
+        }
+        compare = compare or choice_from_dict(compare_to_sign)
+        table = "基金规模变动表"
+
+        return dict(
+            date=date or choice_from_column(table, "截止日期")[:10],
+            compare=compare,
+            sign=compare_to_sign[compare]
+        )
+
+
+# TODO verify
+@dataclass
+class Generator46(Generator):
+    cluster: int = 46
+    question_template: str = "在{year}年12月年报(含半年报)中，{name}基金持有市值最多的前{rank}只股票中，所在证券市场是{market}的有几个？"
+    sql_template: str = """
+    WITH t1 AS (
+        SELECT *
+        FROM 基金股票持仓明细
+        WHERE 持仓日期 = '{year}1231'
+        AND 报告类型 = '年报(含半年报)'
+        AND 基金简称 = '{name}'
+        ORDER BY 市值 DESC
+        LIMIT {rank}
+    )
+    SELECT COUNT(*) AS 数量
+    FROM t1
+    WHERE 所在证券市场 = '{market}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年12月年报(含半年报)中，{name}基金持有市值最多的前{rank}只股票中，所在证券市场是{market}的有{数量}个。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, name=None, rank=None, market=None):
+        table = "基金股票持仓明细"
+
+        return dict(
+            year=year or choice(years),
+            name=name or choice_from_column(table, "基金简称"),
+            rank=rank or randint(5, 20),
+            market=market or choice_from_column(table, "所在证券市场")
+        )
+
+
+# TODO verify
+@dataclass
+class Generator47(Generator):
+    cluster: int = 47
+    question_template: str = "股票{code}在{date}日期中的收盘价是多少?（小数点保留3位）"
+    sql_template: str = """
+    SELECT ROUND([收盘价(元)], 3) AS 收盘价
+    FROM A股票日行情表
+    WHERE 股票代码 = '{code}'
+    AND 交易日 = '{date}'
+    LIMIT 1;
+    """
+    answer_template: str = "股票{code}在{date}日期中的收盘价是{收盘价:.3f}元。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, code=None, date=None):
+        table = "A股票日行情表"
+
+        return dict(
+            code=code or choice_from_column(table, "股票代码"),
+            date=date or choice_from_column(table, "交易日")
+        )
+
+
+# TODO verify
+@dataclass
+class Generator48(Generator):
+    cluster: int = 48
+    question_template: str = "请查询：在{date}，属于{standard}二级{industry2}行业的A股股票，它们的平均成交金额是多少？小数点后保留不超过5位。"
+    sql_template: str = """
+    SELECT ROUND(AVG([成交金额(元)]), 5) AS 平均成交金额
+    FROM A股票日行情表 t1 JOIN A股公司行业划分表 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日 = t2.交易日期
+    AND t1.交易日 = '{date}'
+    AND t2.行业划分标准 = '{standard}行业分类'
+    AND t2.二级行业名称 = '{industry2}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{date}，属于{standard}二级{industry2}行业的A股股票，它们的平均成交金额是{平均成交金额:.5f}元。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, standard=None, industry2=None):
+        table = "A股公司行业划分表"
+
+        return dict(
+            date=date or choice_from_column(table, "交易日期"),
+            standard=standard or choice(standards),
+            industry2=industry2 or choice_from_column(table, "二级行业名称")
+        )
+
+    def postprocess_result(self, result, params):
+        # AVG一定返回一行记录，但值有可能是None
+        result = result[0]
+        return None if result["平均成交金额"] is None else result
+
+
+# TODO verify
+@dataclass
+class Generator49(Generator):
+    cluster: int = 49
+    question_template: str = "我想知道{name}在{year}年{season}的季报中，该基金的第{rank}大重仓股的代码是什么?"
+    sql_template: str = """
+    SELECT 股票代码
+    FROM 基金股票持仓明细
+    WHERE 基金简称 = '{name}'
+    AND 持仓日期 = '{year}{monthday}'
+    AND 报告类型 = '季报'
+    AND 第N大重仓股 = {rank}
+    LIMIT 1;
+    """
+    answer_template: str = "{name}在{year}年{season}的季报中，该基金的第{rank}大重仓股的代码是{股票代码}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, name=None, year=None, season=None, rank=None):
+        season_to_monthday = {
+            "Q1": "0331",
+            "Q2": "0630",
+            "Q3": "0930",
+            "Q4": "1231"
+        }
+        season = season or choice_from_dict(season_to_monthday)
+        table = "基金股票持仓明细"
+
+        return dict(
+            name=name or choice_from_column(table, "基金简称"),
+            year=year or choice(years),
+            season=season,
+            rank=rank or randint(1, 10),
+            monthday=season_to_monthday[season]
+        )
+
+
+# TODO verify
+@dataclass
+class Generator50(Generator):
+    cluster: int = 50
+    question_template: str = "查询下基金代码{code}的基金，它的{target}是？"
+    sql_template: str = """
+    SELECT {target}
+    FROM 基金基本信息
+    WHERE 基金代码 = '{code}'
+    LIMIT 1;
+    """
+    answer_template: str = "基金代码{code}的基金，它的{target}是{result}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, code=None, target=None):
+        targets = ["管理人", "托管人", "基金类型", "管理费率", "托管费率"]
+        table = "基金基本信息"
+
+        return dict(
+            code=code or choice_from_column(table, "基金代码"),
+            target=target or choice(targets)
+        )
+
+    def postprocess_result(self, result, params):
+        return dict(result=result[0][params["target"]]) if result else None
+
+
+# TODO verify
+@dataclass
+class Generator51(Generator):
+    cluster: int = 51
+    question_template: str = "请帮我查询下股票代码为{code}的股票在{year}年内最高日收盘价是多少？"
+    sql_template: str = """
+    SELECT MAX([收盘价(元)]) AS 最高日收盘价
+    FROM A股票日行情表
+    WHERE 股票代码 = '{code}'
+    AND 交易日 LIKE '{year}%'
+    LIMIT 1;
+    """
+    answer_template: str = "股票代码为{code}的股票在{year}年内最高日收盘价是{最高日收盘价}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, code=None, year=None):
+        table = "A股票日行情表"
+
+        return dict(
+            code=code or choice_from_column(table, "股票代码"),
+            year=year or choice(years)
+        )
+
+
+# TODO verify
+@dataclass
+class Generator52(Generator):
+    cluster: int = 52
+    question_template: str = "{name}基金在{date}且报告类型是季报的持债市值中，哪类债券市值最高？"
+    sql_template: str = """
+    SELECT 债券类型
+    FROM 基金债券持仓明细
+    WHERE 基金简称 = '{name}'
+    AND 持仓日期 = '{date}'
+    AND 报告类型 = '季报'
+    GROUP BY 债券类型
+    ORDER BY SUM(持债市值) DESC
+    LIMIT 1;
+    """
+    answer_template: str = "{name}基金在{date}且报告类型是季报的持债市值中，{债券类型}类债券市值最高。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, name=None, date=None):
+        monthdays = ["0331", "0630", "0930", "1231"]
+        table = "基金债券持仓明细"
+
+        return dict(
+            name=name or choice_from_column(table, "基金简称"),
+            date=date or str(choice(years)) + choice(monthdays)
+        )
 
 
 # ====================================================================
