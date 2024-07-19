@@ -1537,7 +1537,6 @@ class Generator37(Generator):
         return None
 
 
-# TODO verify
 @dataclass
 class Generator38(Generator):
     cluster: int = 38
@@ -1555,7 +1554,7 @@ class Generator38(Generator):
     LIMIT 1;
     """
     answer_template: str = "{name}基金在{date}的资产净值是{资产净值}元，单位净值是{单位净值}元。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.64  # 满分1.67
 
     def preprocess_params(self, name=None, date=None):
         table1 = "基金基本信息"
@@ -1567,7 +1566,6 @@ class Generator38(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator39(Generator):
     cluster: int = 39
@@ -1582,7 +1580,7 @@ class Generator39(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年{month}月季报中，持有{name}这一股票且市值占基金资产净值比不小于{percent}%的有{数量}只基金。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.67  # 满分1.67
 
     def preprocess_params(self, year=None, month=None, name=None, percent=None):
         month_to_monthday = {
@@ -1603,7 +1601,6 @@ class Generator39(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator40(Generator):
     cluster: int = 40
@@ -1617,7 +1614,7 @@ class Generator40(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年{month}月{day}日，使用{standard}行业分类标准，股票代码{code}是属于{一级行业名称}一级行业。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.49  # 满分1.67，可能是语义分缺失
 
     def preprocess_params(self, year=None, month=None, day=None, standard=None, code=None):
         table = "A股公司行业划分表"
@@ -1631,7 +1628,6 @@ class Generator40(Generator):
         )
 
 
-# TODO verify 不对的话试下去掉distinct
 @dataclass
 class Generator41a(Generator):
     cluster: int = 41
@@ -1646,7 +1642,7 @@ class Generator41a(Generator):
     LIMIT 1;
     """
     answer_template: str = "{date}日，{name}在{数量}只基金的前{rankzh}大重仓股中。"
-    verification_score: float = None  # 满分
+    verification_score: float = 0.5  # 满分0.5
 
     def preprocess_params(self, date=None, name=None, rankzh=None):
         rankzh = rankzh or choice_from_dict(rankzh_to_rank)
@@ -1660,21 +1656,20 @@ class Generator41a(Generator):
         )
 
 
-# TODO verify 不对的话试下去掉distinct
 @dataclass
 class Generator41b(Generator):
     cluster: int = 41
     question_template: str = "{date}日，{industry1}一级行业有多少只A股股票？"
-    # 题目没有限制行业划分标准，导致股票重复，因此需要加DISTINCT
+    # 题目没有限制行业划分标准，导致股票重复，本应需要加DISTINCT，但是答案没加
     sql_template: str = """
-    SELECT COUNT(DISTINCT(股票代码)) AS 数量
+    SELECT COUNT(*) AS 数量
     FROM A股公司行业划分表
     WHERE 交易日期 = '{date}'
     AND 一级行业名称 = '{industry1}'
     LIMIT 1;
     """
     answer_template: str = "{date}日，{industry1}一级行业有{数量}只A股股票。"
-    verification_score: float = None  # 满分
+    verification_score: float = 0.50  # 满分0.5
 
     def preprocess_params(self, date=None, industry1=None):
         table = "A股公司行业划分表"
@@ -1685,7 +1680,6 @@ class Generator41b(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator41c(Generator):
     cluster: int = 41
@@ -1701,7 +1695,7 @@ class Generator41c(Generator):
     LIMIT 2;
     """
     answer_template: str = "在{year}年报中，{name1}在{num1}只基金的前{rank}大重仓股里，{name2}在{num2}只基金的前{rank}大重仓股里"
-    verification_score: float = None  # 满分
+    verification_score: float = 0.17  # 满分0.17
 
     def preprocess_params(self, year=None, name1=None, name2=None, rank=None):
         table = "基金股票持仓明细"
@@ -1724,7 +1718,6 @@ class Generator41c(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator42(Generator):
     cluster: int = 42
@@ -1746,7 +1739,7 @@ class Generator42(Generator):
     LIMIT 1;
     """
     answer_template: str = "股票代码为{code}的股票在{year}年内日成交量{compare}该股票当年平均日成交量的有{天数}个交易日。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.67  # 满分1.67
 
     def preprocess_params(self, code=None, year=None, compare=None):
         compare_to_sign = {
@@ -1764,7 +1757,6 @@ class Generator42(Generator):
         )
 
 
-# TODO verify DISTINCT 中信/申万
 @dataclass
 class Generator43(Generator):
     cluster: int = 43
@@ -1777,7 +1769,7 @@ class Generator43(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{industry1}行业，{date}行业的A股公司有{数量}间。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.61  # 满分1.67
 
     def preprocess_params(self, industry1=None, date=None):
         table = "A股公司行业划分表"
@@ -1788,7 +1780,6 @@ class Generator43(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator44(Generator):
     cluster: int = 44
@@ -1803,7 +1794,7 @@ class Generator44(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{date}，按照{standard}行业分类的行业划分标准，{一级行业名称}一级行业的A股公司数量最多。"
-    verification_score: float = None  # 满分
+    verification_score: float = 0.97  # 满分1.0
 
     def preprocess_params(self, date=None, standard=None):
         table = "A股公司行业划分表"
@@ -1814,7 +1805,6 @@ class Generator44(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator45(Generator):
     cluster: int = 45
@@ -1827,7 +1817,7 @@ class Generator45(Generator):
     LIMIT 1;
     """
     answer_template: str = "在截止{date}的报告期间，基金总份额{compare}的基金数量是{数量}只。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.47  # 满分1.5
 
     def preprocess_params(self, date=None, compare=None):
         compare_to_sign = {
@@ -1844,7 +1834,6 @@ class Generator45(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator46(Generator):
     cluster: int = 46
@@ -1865,7 +1854,7 @@ class Generator46(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年12月年报(含半年报)中，{name}基金持有市值最多的前{rank}只股票中，所在证券市场是{market}的有{数量}个。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.50  # 满分1.5
 
     def preprocess_params(self, year=None, name=None, rank=None, market=None):
         table = "基金股票持仓明细"
@@ -1878,7 +1867,6 @@ class Generator46(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator47(Generator):
     cluster: int = 47
@@ -1891,7 +1879,7 @@ class Generator47(Generator):
     LIMIT 1;
     """
     answer_template: str = "股票{code}在{date}日期中的收盘价是{收盘价:.3f}元。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.65  # 满分1.67
 
     def preprocess_params(self, code=None, date=None):
         table = "A股票日行情表"
@@ -1902,7 +1890,6 @@ class Generator47(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator48(Generator):
     cluster: int = 48
@@ -1918,7 +1905,7 @@ class Generator48(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{date}，属于{standard}二级{industry2}行业的A股股票，它们的平均成交金额是{平均成交金额:.5f}元。"
-    verification_score: float = None  # 满分
+    verification_score: float = 2.14  # 满分2.17
 
     def preprocess_params(self, date=None, standard=None, industry2=None):
         table = "A股公司行业划分表"
@@ -1935,7 +1922,6 @@ class Generator48(Generator):
         return None if result["平均成交金额"] is None else result
 
 
-# TODO verify
 @dataclass
 class Generator49(Generator):
     cluster: int = 49
@@ -1950,7 +1936,7 @@ class Generator49(Generator):
     LIMIT 1;
     """
     answer_template: str = "{name}在{year}年{season}的季报中，该基金的第{rank}大重仓股的代码是{股票代码}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.43  # 满分1.5
 
     def preprocess_params(self, name=None, year=None, season=None, rank=None):
         season_to_monthday = {
@@ -1971,7 +1957,6 @@ class Generator49(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator50(Generator):
     cluster: int = 50
@@ -1983,7 +1968,7 @@ class Generator50(Generator):
     LIMIT 1;
     """
     answer_template: str = "基金代码{code}的基金，它的{target}是{result}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.62  # 满分1.67
 
     def preprocess_params(self, code=None, target=None):
         targets = ["管理人", "托管人", "基金类型", "管理费率", "托管费率"]
@@ -1998,7 +1983,6 @@ class Generator50(Generator):
         return dict(result=result[0][params["target"]]) if result else None
 
 
-# TODO verify
 @dataclass
 class Generator51(Generator):
     cluster: int = 51
@@ -2011,7 +1995,7 @@ class Generator51(Generator):
     LIMIT 1;
     """
     answer_template: str = "股票代码为{code}的股票在{year}年内最高日收盘价是{最高日收盘价}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.50  # 满分1.5
 
     def preprocess_params(self, code=None, year=None):
         table = "A股票日行情表"
@@ -2022,32 +2006,63 @@ class Generator51(Generator):
         )
 
 
-# TODO verify
 @dataclass
 class Generator52(Generator):
     cluster: int = 52
-    question_template: str = "{name}基金在{date}且报告类型是季报的持债市值中，哪类债券市值最高？"
+    question_template: str = "{name}基金在{date}且报告类型是{report}的持债市值中，哪类债券市值最高？"
     sql_template: str = """
     SELECT 债券类型
     FROM 基金债券持仓明细
     WHERE 基金简称 = '{name}'
     AND 持仓日期 = '{date}'
-    AND 报告类型 = '季报'
+    AND 报告类型 = '{report}'
     GROUP BY 债券类型
     ORDER BY SUM(持债市值) DESC
     LIMIT 1;
     """
-    answer_template: str = "{name}基金在{date}且报告类型是季报的持债市值中，{债券类型}类债券市值最高。"
-    verification_score: float = None  # 满分
+    answer_template: str = "{name}基金在{date}且报告类型是{report}的持债市值中，{债券类型}类债券市值最高。"
+    verification_score: float = 1.14  # 满分1.17
 
-    def preprocess_params(self, name=None, date=None):
+    def preprocess_params(self, name=None, date=None, report=None):
         monthdays = ["0331", "0630", "0930", "1231"]
         table = "基金债券持仓明细"
 
         return dict(
             name=name or choice_from_column(table, "基金简称"),
-            date=date or str(choice(years)) + choice(monthdays)
+            date=date or str(choice(years)) + choice(monthdays),
+            report=report or choice_from_column(table, "报告类型")
         )
+
+
+@dataclass
+class Generator53(Generator):
+    cluster: int = 53
+    question_template: str = "我想知道在{date}的季报里，{name}投资的股票分别是哪些{standard}一级行业？"
+    sql_template: str = """
+    SELECT DISTINCT(一级行业名称)
+    FROM A股公司行业划分表 t1 JOIN 基金股票持仓明细 t2
+    ON t1.股票代码 = t2.股票代码
+    AND t1.交易日期 = t2.持仓日期
+    AND t1.交易日期 = '{date}'
+    AND t1.行业划分标准 = '{standard}行业分类'
+    AND t2.报告类型 = '季报'
+    AND t2.基金简称 = '{name}';
+    """
+    answer_template: str = "在{date}的季报里，{name}投资的股票分别是{result}{standard}一级行业。"
+    verification_score: float = 1.11  # 满分1.17
+
+    def preprocess_params(self, date=None, name=None, standard=None):
+        monthdays = ["0331", "0630", "0930", "1231"]
+        table = "基金股票持仓明细"
+
+        return dict(
+            date=date or str(choice(years)) + choice(monthdays),
+            name=name or choice_from_column(table, "基金简称"),
+            standard=standard or choice(standards)
+        )
+
+    def postprocess_result(self, result, params):
+        return dict(result="、".join([record["一级行业名称"] for record in result])) if result else None
 
 
 # ====================================================================
