@@ -39,6 +39,14 @@ class Record(NamedTuple):
     def pretty_print(self, *fields):
         self.print(*fields, expand_sql=True, endl=2)
 
+    def to_dict(self):
+        return {
+            "问题": self.question,
+            "SQL": self.sql,
+            "SQL结果": self.result,
+            "答案": self.answer
+        }
+
 
 generator_dict = defaultdict(dict)
 
@@ -49,7 +57,7 @@ class GeneratorMeta(type):
         super().__init__(name, bases, attr)
         if bases:
             gen = cls(**{key: attr[key] for key in attr["__annotations__"].keys()})
-            generator_dict[gen.cluster][gen.name] = gen
+            generator_dict[gen.cluster][gen.abbr] = gen
 
 
 @dataclass
@@ -68,6 +76,8 @@ class Generator(metaclass=GeneratorMeta):
 
         assert " \n" not in self.sql_template, "SQL模板行末存在空格"
         self.sql_template = self.sql_template.replace("\n    ", "\n").strip()
+        assert self.sql_template.endswith(";"), "SQL模板结尾没有加上分号"
+        assert self.answer_template.endswith("。"), "答案模板结尾没有加上句号"
 
         self.database = Config.get_database()
         self.question_df = Config.get_question_df()
@@ -90,51 +100,67 @@ class Generator(metaclass=GeneratorMeta):
     def postprocess_result(self, result, params):
         return result[0] if result else None
 
-    def __call__(self, **params):
-        params = self.preprocess_params(**params)
-        question = self.question_template.format(**params)
-        sql = self.sql_template.format(**params)
-        result = self.database.query(sql).to_dict(orient="records")
-
-        result2 = self.postprocess_result(result, params)
-        answer = self.answer_template.format(**params, **result2) if result2 else None
-        return Record(params, question, sql, result, answer)
-
     def parse(self, question):
         try:
             return String.backstep_format_params(self.question_template, question)
         except ValueError:
             return None
 
+    def _get_params_question_sql(self, params):
+        params = self.preprocess_params(**params)
+        question = self.question_template.format(**params)
+        sql = self.sql_template.format(**params)
+        return params, question, sql
+
+    def _get_record(self, params, question, sql, result):
+        result2 = self.postprocess_result(result, params)
+        answer = self.answer_template.format(**params, **result2) if result2 else None
+        return Record(params, question, sql, result, answer)
+
+    def __call__(self, **params):
+        params, question, sql = self._get_params_question_sql(params)
+        result = self.database.query(sql).to_dict(orient="records")
+        return self._get_record(params, question, sql, result)
+
     def query(self, question):
         params = self.parse(question)
         assert params, f"问题({repr(question)})与问题模板({repr(self.question_template)})不匹配"
         record = self(**params)
+
         # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
         assert question == record.question, f"输入问题({repr(question)})与生成问题({repr(record.question)})不一致"
         return record
 
+    def batch(self, *params_list, progress=True):
+        params_list, questions, sqls = zip(*[self._get_params_question_sql(params) for params in params_list])
+        raw_results = self.database.batch_query(sqls, progress=progress,
+                                                tqdm_desc=f"聚类{self.abbr}/{Config.SQL_CLUSTER_NUM}")
+
+        records = list()
+        for params, question, sql, raw_result in zip(params_list, questions, sqls, raw_results):
+            result = raw_result.to_dict(orient="records")
+            records.append(self._get_record(params, question, sql, result))
+        return records
+
     def batch_query(self, questions, progress=True):
         params_list = list()
-        sqls = list()
         for question in questions:
             params = self.parse(question)
             assert params, f"问题({repr(question)})与问题模板({repr(self.question_template)})不匹配"
-            params = self.preprocess_params(**params)
-            # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
-            question2 = self.question_template.format(**params)
-            assert question == question2, f"输入问题({repr(question)})与生成问题({repr(question2)})不一致"
             params_list.append(params)
-            sqls.append(self.sql_template.format(**params))
+        records = self.batch(*params_list, progress=progress)
 
-        records = list()
-        raw_results = self.database.batch_query(sqls, progress=progress,
-                                                tqdm_desc=f"聚类{self.abbr}/{Config.SQL_CLUSTER_NUM}")
-        for params, question, sql, raw_result in zip(params_list, questions, sqls, raw_results):
-            result = raw_result.to_dict(orient="records")
-            result2 = self.postprocess_result(result, params)
-            answer = self.answer_template.format(**params, **result2) if result2 else None
-            records.append(Record(params, question, sql, result, answer))
+        for question, record in zip(questions, records):
+            # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
+            assert question == record.question, f"输入问题({repr(question)})与生成问题({repr(record.question)})不一致"
+        return records
+
+    def generate(self, n, progress=True):
+        params_list = [dict()] * n
+        records = [record for record in self.batch(*params_list, progress=progress) if record.answer]
+        if (res := n - len(records)) > 0:
+            print(f"聚类{self.abbr}有{res}个答案为None，重新生成")
+            records.extend(self.generate(res, progress=progress))
         return records
 
     @property

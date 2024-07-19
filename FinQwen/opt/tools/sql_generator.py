@@ -10,6 +10,7 @@ from random import choice
 from random import randint
 
 import pandas as pd
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 from config import Config
@@ -236,12 +237,17 @@ class Generator4(Generator):
     verification_score: float = 4.38  # 满分4.5，应该是id=326数据有问题
 
     def preprocess_params(self, name=None, date=None, report=None, standard=None):
+        report_to_monthdays = {
+            "年报(含半年报)": ["0630", "1231"],
+            "季报": ["0331", "0630", "0930", "1231"]
+        }
+        report = report or choice_from_dict(report_to_monthdays)
         table = "基金可转债持仓明细"
 
         return dict(
             name=name or choice_from_column(table, "基金简称"),
-            date=date or choice_from_column(table, "持仓日期"),
-            report=report or choice_from_column(table, "报告类型"),
+            date=date or str(choice(years)) + choice(report_to_monthdays[report]),
+            report=report,
             standard=standard or choice(standards)
         )
 
@@ -249,28 +255,28 @@ class Generator4(Generator):
 @dataclass
 class Generator5(Generator):
     cluster: int = 5
-    question_template: str = "在{date}的{report}中，{name}基金的债券持仓,其持有最大仓位的债券类型是什么?"
+    question_template: str = "在{date}的年报(含半年报)中，{name}基金的债券持仓,其持有最大仓位的债券类型是什么?"
     # 一开始直接取”第N大重仓股“最小的那个，分数只有1.77
     sql_template: str = """
     SELECT 债券类型
     FROM 基金债券持仓明细
     WHERE 持仓日期 = '{date}'
-    AND 报告类型 = '{report}'
+    AND 报告类型 = '年报(含半年报)'
     AND 基金简称 = '{name}'
     GROUP BY 债券类型
     ORDER BY SUM(持债市值) DESC
     LIMIT 1;
     """
 
-    answer_template: str = "在{date}的{report}中，{name}基金的债券持仓,其持有最大仓位的债券类型是{债券类型}。"
+    answer_template: str = "在{date}的年报(含半年报)中，{name}基金的债券持仓,其持有最大仓位的债券类型是{债券类型}。"
     verification_score: float = 1.97  # 满分2.0
 
-    def preprocess_params(self, date=None, report=None, name=None):
+    def preprocess_params(self, date=None, name=None):
+        monthdays = ["0331", "0630", "0930", "1231"]
         table = "基金债券持仓明细"
 
         return dict(
-            date=date or choice_from_column(table, "持仓日期"),
-            report=report or choice_from_column(table, "报告类型"),
+            date=date or str(choice(years)) + choice(monthdays),
             name=name or choice_from_column(table, "基金简称")
         )
 
@@ -515,7 +521,7 @@ class Generator11(Generator):
             name=name or choice_from_column(table, "基金简称"),
             year=year or choice(years),
             season=season,
-            rank=rank or randint(1, 9),
+            rank=rank or randint(1, 6),
             start=start,
             end=end
         )
@@ -784,27 +790,27 @@ class Generator17(Generator):
 @dataclass
 class Generator18(Generator):
     cluster: int = 18
-    question_template: str = "{name}基金在{date}的{report}里，前{rankzh}大持仓占比的债券名称是什么?"
+    question_template: str = "{name}基金在{date}的季报里，前{rankzh}大持仓占比的债券名称是什么?"
     sql_template: str = """
     SELECT 债券名称
     FROM 基金债券持仓明细
     WHERE 基金简称 = '{name}'
     AND 持仓日期 = '{date}'
-    AND 报告类型 = '{report}'
+    AND 报告类型 = '季报'
     ORDER BY 第N大重仓股 ASC
     LIMIT {rank};
     """
-    answer_template: str = "{name}基金在{date}的{report}里，前{rankzh}大持仓占比的债券名称是{result}。"
+    answer_template: str = "{name}基金在{date}的季报里，前{rankzh}大持仓占比的债券名称是{result}。"
     verification_score: float = 3.27  # 满分3.33
 
-    def preprocess_params(self, name=None, date=None, report=None, rankzh=None):
+    def preprocess_params(self, name=None, date=None, rankzh=None):
+        monthdays = ["0331", "0630", "0930", "1231"]
         rankzh = rankzh or choice_from_dict(rankzh_to_rank)
         table = "基金债券持仓明细"
 
         return dict(
             name=name or choice_from_column(table, "基金简称"),
-            date=date or choice_from_column(table, "持仓日期"),
-            report=report or choice_from_column(table, "报告类型"),
+            date=date or str(choice(years)) + choice(monthdays),
             rankzh=rankzh,
             rank=rankzh_to_rank[rankzh]
         )
@@ -1210,7 +1216,7 @@ class Generator29(Generator):
         return dict(
             year=year or choice(years),
             code=code or choice_from_column(table1, "基金代码"),
-            rank=rank or randint(1, 20),
+            rank=rank or randint(20, 40),
             standard=standard or choice(standards),
             industry2=industry2 or choice_from_column(table2, "二级行业名称")
         )
@@ -1696,7 +1702,7 @@ class Generator41c(Generator):
     GROUP BY 股票名称
     LIMIT 2;
     """
-    answer_template: str = "在{year}年报中，{name1}在{num1}只基金的前{rank}大重仓股里，{name2}在{num2}只基金的前{rank}大重仓股里"
+    answer_template: str = "在{year}年报中，{name1}在{num1}只基金的前{rank}大重仓股里，{name2}在{num2}只基金的前{rank}大重仓股里。"
     verification_score: float = 0.17  # 满分0.17
 
     def preprocess_params(self, year=None, name1=None, name2=None, rank=None):
@@ -2026,13 +2032,17 @@ class Generator52(Generator):
     verification_score: float = 1.14  # 满分1.17
 
     def preprocess_params(self, name=None, date=None, report=None):
-        monthdays = ["0331", "0630", "0930", "1231"]
+        report_to_monthdays = {
+            "年报(含半年报)": ["0630", "1231"],
+            "季报": ["0331", "0630", "0930", "1231"]
+        }
+        report = report or choice_from_dict(report_to_monthdays)
         table = "基金债券持仓明细"
 
         return dict(
             name=name or choice_from_column(table, "基金简称"),
-            date=date or str(choice(years)) + choice(monthdays),
-            report=report or choice_from_column(table, "报告类型")
+            date=date or str(choice(years)) + choice(report_to_monthdays[report]),
+            report=report
         )
 
 
@@ -2178,6 +2188,32 @@ class ManagerMeta(type):
 
         score = str(cls.score).replace(".", "p")
         File.dataframe_to_jsonl(df, f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl")
+
+    # TODO ing
+    def generate_dataset(cls, train_size, val_size, test_size):
+        total_size = train_size + val_size + test_size
+
+        # TODO debug
+        generator_list = cls.generator_list[:5]
+
+        gen_num = len(generator_list)
+        div, mod = divmod(total_size, gen_num)
+        assigns = [div + int(i < mod) for i in range(gen_num)]
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(gen.generate, assign, progress=False)
+                       for gen, assign in zip(generator_list, assigns)]
+            df = pd.DataFrame([record.to_dict() for future in tqdm(futures) for record in future.result()])
+
+        train_df, val_test_df = train_test_split(df, train_size=train_size, random_state=Config.SEED)
+        val_df, test_df = train_test_split(val_test_df, train_size=val_size, random_state=Config.SEED)
+        train_df.reset_index(drop=True, inplace=True)
+        val_df.reset_index(drop=True, inplace=True)
+        test_df.reset_index(drop=True, inplace=True)
+
+        # TODO 存起来
+
+        return train_df, val_df, test_df
 
 
 class Manager(metaclass=ManagerMeta):
