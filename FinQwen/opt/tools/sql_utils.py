@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file sql_utils_v2.py
+# @file sql_utils.py
 # @author zhangshilong
 # @date 2024/7/15
 
@@ -13,9 +13,9 @@ from typing import Union
 
 import pandas as pd
 
-from ..tools.config import Config
-from ..tools.utils import File
-from ..tools.utils import String
+from config import Config
+from utils import File
+from utils import String
 
 
 class Record(NamedTuple):
@@ -40,12 +40,20 @@ class Record(NamedTuple):
         self.print(*fields, expand_sql=True, endl=2)
 
 
-class Manager:
-    generators = defaultdict(dict)
+generator_dict = defaultdict(dict)
+
+
+class GeneratorMeta(type):
+    # 当子类定义时，自动实例化并注册到generators
+    def __init__(cls, name, bases, attr):
+        super().__init__(name, bases, attr)
+        if bases:
+            gen = cls(**{key: attr[key] for key in attr["__annotations__"].keys()})
+            generator_dict[gen.cluster][gen.name] = gen
 
 
 @dataclass
-class Generator:
+class Generator(metaclass=GeneratorMeta):
     cluster: int
     question_template: str
     sql_template: str
@@ -65,16 +73,15 @@ class Generator:
         self.question_df = Config.get_question_df()
         self.aggregation_df = Config.get_sql_question_aggregation_df()
         self.cluster_df = self._get_cluster_df()
-        self.expectation_score = round(100 / Config.SQL_QUESTION_NUM * len(self.cluster_df), 2)
         self.questions = self.cluster_df["问题"].tolist()
+        self.question_num = len(self.cluster_df)
+        self.expectation_score = round(100 / Config.SQL_QUESTION_NUM * self.question_num, 2)
         self._records = None
-
-        Manager.generators[self.cluster][self.name] = self
 
     def _get_cluster_df(self):
         cluster_df = self.aggregation_df.query(f"问题聚类 == {self.cluster}")
         condition = cluster_df["问题"].map(self.parse).astype(bool)
-        print(f"加载{sum(condition)}/{len(condition)}个问题")
+        # print(f"加载{sum(condition)}/{len(condition)}个问题")
         return cluster_df[condition].reset_index(drop=True)
 
     def preprocess_params(self, **params):
@@ -107,7 +114,7 @@ class Generator:
         assert question == record.question, f"输入问题({repr(question)})与生成问题({repr(record.question)})不一致"
         return record
 
-    def batch_query(self, questions):
+    def batch_query(self, questions, progress=True):
         params_list = list()
         sqls = list()
         for question in questions:
@@ -121,7 +128,8 @@ class Generator:
             sqls.append(self.sql_template.format(**params))
 
         records = list()
-        raw_results = self.database.batch_query(sqls)
+        raw_results = self.database.batch_query(sqls, progress=progress,
+                                                tqdm_desc=f"聚类{self.abbr}/{Config.SQL_CLUSTER_NUM}")
         for params, question, sql, raw_result in zip(params_list, questions, sqls, raw_results):
             result = raw_result.to_dict(orient="records")
             result2 = self.postprocess_result(result, params)
@@ -134,9 +142,9 @@ class Generator:
         self.refresh_records()
         return self._records
 
-    def refresh_records(self, force=False):
+    def refresh_records(self, force=False, progress=True):
         if force or not self._records:
-            self._records = self.batch_query(self.questions)
+            self._records = self.batch_query(self.questions, progress=progress)
             for record in self._records:
                 if not record.answer:
                     print(f"[警告！] 问题({repr(record.question)})没有查询到答案！SQL:\n{record.sql}")
@@ -157,4 +165,4 @@ class Generator:
         score = str(self.expectation_score).replace(".", "p")
         generator_dir = f"{Config.PREPARE_OUTPUT_DIR}/generator"
         File.makedirs(generator_dir)
-        File.dataframe_to_jsonl(df, f"{generator_dir}/{self.abbr}_{len(self.cluster_df)}_{score}_submit_result.jsonl")
+        File.dataframe_to_jsonl(df, f"{generator_dir}/{self.abbr}_{self.question_num}_{score}_submit_result.jsonl")

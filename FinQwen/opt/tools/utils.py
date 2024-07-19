@@ -246,9 +246,11 @@ class Database:
 
     # 加了@cache的实例、sqlite3.Connection不能pickle，因此只能每次查询时新建连接（反正创建连接很快，而且sqlite3内部应该会维护连接线程池）
     # notebook使用多进程时有小概率一开始就卡住，多试几次就好了
-    def batch_query(self, sqls: List[str], max_workers: int = os.cpu_count(), tqdm_desc: Optional[str] = None,
-                    *args, **kwargs) -> List[pd.DataFrame]:
+    def batch_query(self, sqls: List[str], max_workers: int = os.cpu_count(), progress: bool = True,
+                    tqdm_desc: Optional[str] = None, *args, **kwargs) -> List[pd.DataFrame]:
         with ProcessPoolExecutor(max_workers) as executor:
             futures = [executor.submit(self.query, sql, *args, **kwargs) for sql in sqls]
+            if progress:
+                futures = tqdm(futures, tqdm_desc)
             # as_completed(futures)是按执行完成顺序返回的
-            return [future.result() for future in tqdm(futures, tqdm_desc)]
+            return [future.result() for future in futures]

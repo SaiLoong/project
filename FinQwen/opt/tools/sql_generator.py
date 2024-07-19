@@ -1,26 +1,28 @@
 # -*- coding: utf-8 -*-
-# @file sql_generator_v2.py
+# @file sql_generator.py
 # @author zhangshilong
-# @date 2024/7/15
+# @date 2024/7/19
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from random import choice
 from random import randint
 
+import pandas as pd
+from tqdm import tqdm
+
+from config import Config
 from sql_utils import Generator
-from ..tools.config import Config
+from sql_utils import generator_dict
+from utils import File
 
-# TODO debug
-db = Config.get_database()
-
-db_metadata = Config.get_database_metadata()
 distinct_values_dct = {
     table: {
         record["字段名"]: record["唯一值抽样"]
         for record in v["字段信息"]
     }
-    for table, v in db_metadata.items()
+    for table, v in Config.get_database_metadata().items()
 }
 
 
@@ -112,7 +114,7 @@ class Generator2(Generator):
     WHERE 股票代码 = '{code}'
     AND 交易日 LIKE '{year}%'
     AND [今开盘(元)] {sign} [昨收盘(元)]
-    LIMIT 1;  
+    LIMIT 1;
     """
     answer_template: str = "在{year}年，代码为{code}的{stock}股票今开盘{compare}昨收盘的天数是{天数}天。"
     verification_score: float = 1.81  # 满分1.83
@@ -2065,7 +2067,7 @@ class Generator53(Generator):
         return dict(result="、".join([record["一级行业名称"] for record in result])) if result else None
 
 
-# TODO verify
+# TODO verify, 临时填上分数
 @dataclass
 class Generator54(Generator):
     cluster: int = 54
@@ -2078,7 +2080,7 @@ class Generator54(Generator):
     LIMIT 1;
     """
     answer_template: str = "{manager}管理的{category}产品的数量有{数量}只。"
-    verification_score: float = None  # 满分
+    verification_score: float = 0.83  # 满分0.83
 
     def preprocess_params(self, manager=None, category=None):
         table = "基金基本信息"
@@ -2089,7 +2091,7 @@ class Generator54(Generator):
         )
 
 
-# TODO verify 振幅的定义是啥？ 百度说是 (最高-最低)/昨收
+# TODO verify, 临时填上分数 振幅的定义是啥？ 百度说是 (最高-最低)/昨收
 @dataclass
 class Generator55(Generator):
     cluster: int = 55
@@ -2102,7 +2104,7 @@ class Generator55(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{date},代码为{code}的港股日价格振幅是{日价格振幅:.3f}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.33  # 满分1.33
 
     def preprocess_params(self, date=None, code=None):
         table = "港股票日行情表"
@@ -2113,7 +2115,7 @@ class Generator55(Generator):
         )
 
 
-# TODO verify
+# TODO verify, 临时填上分数
 @dataclass
 class Generator56(Generator):
     cluster: int = 56
@@ -2128,7 +2130,7 @@ class Generator56(Generator):
     LIMIT 1;
     """
     answer_template: str = "在{year}年报中，{name}基金第{rankzh}大重仓股的代码是{股票代码}，股票名称是{股票名称}。"
-    verification_score: float = None  # 满分
+    verification_score: float = 1.67  # 满分1.67
 
     def preprocess_params(self, year=None, name=None, rankzh=None):
         rankzh = rankzh or choice_from_dict(rankzh_to_rank)
@@ -2142,35 +2144,41 @@ class Generator56(Generator):
         )
 
 
-# ====================================================================
-# 模板
+class ManagerMeta(type):
+    def __init__(cls, name, bases, attr):
+        super().__init__(name, bases, attr)
+        assert len(generator_dict) == Config.SQL_CLUSTER_NUM
+        cls.generator_dict = generator_dict
+        cls.generator_list = sum([list(v.values()) for v in generator_dict.values()], list())  # 64个
+        assert sum(gen.question_num for gen in cls.generator_list) == Config.SQL_QUESTION_NUM
+        cls.question_df = Config.get_question_df()
+        cls.score = round(sum([gen.verification_score for gen in cls.generator_list]), 2)
 
-# TODO verify ing
-@dataclass
-class Generator(Generator):
-    cluster: int = NotImplemented
-    question_template: str = ""
-    sql_template: str = ""
-    answer_template: str = ""
-    verification_score: float = None  # 满分
+    def analysis(cls):
+        print(f"data_query预计得分: {cls.score}\n")
 
-    def preprocess_params(self):
-        table = ""
+        print(f"丢分超过0.1的Generator:")
+        for gen in cls.generator_list:
+            diff = gen.expectation_score - gen.verification_score
+            if diff >= 0.1:
+                print(f"[{gen.abbr}] {gen.verification_score}/{gen.expectation_score}")
 
-        return dict(
-        )
+    def export(cls):
+        # 28a、28b非常久，尤其28b一条问题需要4min+，单线程的话长时间导致CPU空闲，从13:19降至10:36
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(gen.refresh_records, progress=False) for gen in cls.generator_list]
+            # 不能用as_complete(tqdm(futures)) ,进度条一致保持0不动
+            [future.result() for future in tqdm(futures)]
+
+        cluster_df = pd.concat([gen.cluster_df for gen in cls.generator_list])
+        assert len(cluster_df) == Config.SQL_QUESTION_NUM
+        df = pd.merge(cls.question_df, cluster_df[["问题id", "答案"]], how="left", on="问题id")
+        df.fillna("", inplace=True)
+        df.rename(columns={"问题id": "id", "问题": "question", "答案": "answer"}, inplace=True)
+
+        score = str(cls.score).replace(".", "p")
+        File.dataframe_to_jsonl(df, f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl")
 
 
-question = ""
-
-sql = """
-SELECT *
-FROM
-WHERE
-AND
-AND
-
-LIMIT 100;
-"""
-
-db.query(sql)
+class Manager(metaclass=ManagerMeta):
+    pass
