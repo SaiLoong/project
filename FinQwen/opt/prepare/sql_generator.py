@@ -2065,6 +2065,83 @@ class Generator53(Generator):
         return dict(result="、".join([record["一级行业名称"] for record in result])) if result else None
 
 
+# TODO verify
+@dataclass
+class Generator54(Generator):
+    cluster: int = 54
+    question_template: str = "{manager}管理的{category}产品的数量有多少?"
+    sql_template: str = """
+    SELECT COUNT(*) AS 数量
+    FROM 基金基本信息
+    WHERE 管理人 = '{manager}'
+    AND 基金类型 = '{category}'
+    LIMIT 1;
+    """
+    answer_template: str = "{manager}管理的{category}产品的数量有{数量}只。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, manager=None, category=None):
+        table = "基金基本信息"
+
+        return dict(
+            manager=manager or choice_from_column(table, "管理人"),
+            category=category or choice_from_column(table, "基金类型")
+        )
+
+
+# TODO verify 振幅的定义是啥？ 百度说是 (最高-最低)/昨收
+@dataclass
+class Generator55(Generator):
+    cluster: int = 55
+    question_template: str = "帮我算一下在{date},代码为{code}的港股日价格振幅是多少，小数点后保留不超过3位。"
+    sql_template: str = """
+    SELECT ROUND(([最高价(元)] - [最低价(元)]) / [昨收盘(元)], 3) AS 日价格振幅
+    FROM 港股票日行情表
+    WHERE 交易日 = '{date}'
+    AND 股票代码 = '{code}'
+    LIMIT 1;
+    """
+    answer_template: str = "在{date},代码为{code}的港股日价格振幅是{日价格振幅:.3f}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, date=None, code=None):
+        table = "港股票日行情表"
+
+        return dict(
+            date=date or choice_from_column(table, "交易日"),
+            code=code or choice_from_column(table, "股票代码")
+        )
+
+
+# TODO verify
+@dataclass
+class Generator56(Generator):
+    cluster: int = 56
+    question_template: str = "在{year}年报中，{name}基金第{rankzh}大重仓股的代码和股票名称是什么？"
+    sql_template: str = """
+    SELECT 股票代码, 股票名称
+    FROM 基金股票持仓明细
+    WHERE 持仓日期 = '{year}1231'
+    AND 报告类型 = '年报(含半年报)'
+    AND 基金简称 = '{name}'
+    AND 第N大重仓股 = {rank}
+    LIMIT 1;
+    """
+    answer_template: str = "在{year}年报中，{name}基金第{rankzh}大重仓股的代码是{股票代码}，股票名称是{股票名称}。"
+    verification_score: float = None  # 满分
+
+    def preprocess_params(self, year=None, name=None, rankzh=None):
+        rankzh = rankzh or choice_from_dict(rankzh_to_rank)
+        table = "基金股票持仓明细"
+
+        return dict(
+            year=year or choice(years),
+            name=name or choice_from_column(table, "基金简称"),
+            rankzh=rankzh,
+            rank=rankzh_to_rank[rankzh]
+        )
+
+
 # ====================================================================
 # 模板
 
