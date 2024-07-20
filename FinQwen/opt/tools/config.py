@@ -51,11 +51,11 @@ class Config(metaclass=ConfigMeta):
     QUESTION_NUM = 1000
     TEXT_QUESTION_NUM = 400
     SQL_QUESTION_NUM = QUESTION_NUM - TEXT_QUESTION_NUM
-    SQL_CLUSTER_NUM = 57
 
     CLASSIFICATION_TEST_QUESTION_SAMPLE_NUM = 100
     DATABASE_RECORD_SAMPLE_NUM = 1000
     COLUMN_DISTINCT_VALUE_SAMPLE_NUM = 1000
+    SQL_CLUSTER_NUM = 57
 
     WORKSPACE_DIR = "/mnt/workspace"
 
@@ -83,6 +83,10 @@ class Config(metaclass=ConfigMeta):
     QUESTION_CLASSIFICATION_PATH = File.join(INTERMEDIATE_DIR, "A2_question_classification.csv")
     SQL_QUESTION_AGGREGATION_PATH = File.join(INTERMEDIATE_DIR, "sql_question_aggregation.csv")
     DATABASE_METADATA_PATH = File.join(INTERMEDIATE_DIR, "database_metadata.json")
+    SQL_DATASET_DIR = File.join(INTERMEDIATE_DIR, "sql_dataset")
+    SQL_TRAIN_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_train_question.csv")
+    SQL_VAL_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_val_question.csv")
+    SQL_TEST_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_test_question.csv")
 
     MODEL_NAME = ModelName.TONGYI_FINANCE_14B_CHAT_INT4
 
@@ -153,6 +157,22 @@ class Config(metaclass=ConfigMeta):
     @classmethod
     def get_database_metadata(cls):
         return File.json_load(cls.DATABASE_METADATA_PATH)
+
+    @classmethod
+    def get_sql_train_question_df(cls):
+        return pd.read_csv(cls.SQL_TRAIN_QUESTION_PATH)
+
+    @classmethod
+    def get_sql_val_question_df(cls):
+        return pd.read_csv(cls.SQL_VAL_QUESTION_PATH)
+
+    @classmethod
+    def get_sql_test_question_df(cls):
+        return pd.read_csv(cls.SQL_TEST_QUESTION_PATH)
+
+    @classmethod
+    def get_sql_question_dfs(cls):
+        return cls.get_sql_train_question_df(), cls.get_sql_val_question_df(), cls.get_sql_test_question_df()
 
     @classmethod
     def get_tokenizer(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, **kwargs):

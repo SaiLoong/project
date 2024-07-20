@@ -2077,7 +2077,6 @@ class Generator53(Generator):
         return dict(result="、".join([record["一级行业名称"] for record in result])) if result else None
 
 
-# TODO verify, 临时填上分数
 @dataclass
 class Generator54(Generator):
     cluster: int = 54
@@ -2090,7 +2089,7 @@ class Generator54(Generator):
     LIMIT 1;
     """
     answer_template: str = "{manager}管理的{category}产品的数量有{数量}只。"
-    verification_score: float = 0.83  # 满分0.83
+    verification_score: float = 0.81  # 满分0.83
 
     def preprocess_params(self, manager=None, category=None):
         table = "基金基本信息"
@@ -2101,7 +2100,6 @@ class Generator54(Generator):
         )
 
 
-# TODO verify, 临时填上分数 振幅的定义是啥？ 百度说是 (最高-最低)/昨收
 @dataclass
 class Generator55(Generator):
     cluster: int = 55
@@ -2125,7 +2123,6 @@ class Generator55(Generator):
         )
 
 
-# TODO verify, 临时填上分数
 @dataclass
 class Generator56(Generator):
     cluster: int = 56
@@ -2189,30 +2186,26 @@ class ManagerMeta(type):
         score = str(cls.score).replace(".", "p")
         File.dataframe_to_jsonl(df, f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl")
 
-    # TODO ing
     def generate_dataset(cls, train_size, val_size, test_size):
         total_size = train_size + val_size + test_size
-
-        # TODO debug
-        generator_list = cls.generator_list[:5]
-
-        gen_num = len(generator_list)
+        gen_num = len(cls.generator_list)
         div, mod = divmod(total_size, gen_num)
         assigns = [div + int(i < mod) for i in range(gen_num)]
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(gen.generate, assign, progress=False)
-                       for gen, assign in zip(generator_list, assigns)]
+                       for gen, assign in zip(cls.generator_list, assigns)]
             df = pd.DataFrame([record.to_dict() for future in tqdm(futures) for record in future.result()])
 
-        train_df, val_test_df = train_test_split(df, train_size=train_size, random_state=Config.SEED)
-        val_df, test_df = train_test_split(val_test_df, train_size=val_size, random_state=Config.SEED)
+        train_df, val_test_df = train_test_split(df, train_size=train_size)
+        val_df, test_df = train_test_split(val_test_df, train_size=val_size)
         train_df.reset_index(drop=True, inplace=True)
         val_df.reset_index(drop=True, inplace=True)
         test_df.reset_index(drop=True, inplace=True)
 
-        # TODO 存起来
-
+        File.dataframe_to_csv(train_df, Config.SQL_TRAIN_QUESTION_PATH)
+        File.dataframe_to_csv(val_df, Config.SQL_VAL_QUESTION_PATH)
+        File.dataframe_to_csv(test_df, Config.SQL_TEST_QUESTION_PATH)
         return train_df, val_df, test_df
 
 
