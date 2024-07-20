@@ -2159,7 +2159,7 @@ class ManagerMeta(type):
         cls.generator_list = sum([list(v.values()) for v in generator_dict.values()], list())  # 64个
         assert sum(gen.question_num for gen in cls.generator_list) == Config.SQL_QUESTION_NUM
         cls.question_df = Config.get_question_df()
-        cls.score = round(sum([gen.verification_score for gen in cls.generator_list]), 2)
+        cls.score = round(sum([gen.verification_score for gen in cls.generator_list]), 2)  # 97.24，实测97.22
 
     def analysis(cls):
         print(f"data_query预计得分: {cls.score}\n")
@@ -2171,7 +2171,7 @@ class ManagerMeta(type):
                 print(f"[{gen.abbr}] {gen.verification_score}/{gen.expectation_score}")
 
     def export(cls):
-        # 28a、28b非常久，尤其28b一条问题需要4min+，单线程的话长时间导致CPU空闲，从13:19降至10:36
+        # 28a、28b非常久，尤其28b一条问题需要4min+，单线程的话长时间导致CPU空闲，从13:19降至10:20
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(gen.refresh_records, progress=False) for gen in cls.generator_list]
             # 不能用as_complete(tqdm(futures)) ,进度条一致保持0不动
@@ -2187,6 +2187,7 @@ class ManagerMeta(type):
         File.dataframe_to_jsonl(df, f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl")
 
     def generate_dataset(cls, train_size, val_size, test_size):
+        # 10000-1000-1000耗时约7h左右（主要是28a、28b太久了）
         total_size = train_size + val_size + test_size
         gen_num = len(cls.generator_list)
         div, mod = divmod(total_size, gen_num)

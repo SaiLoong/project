@@ -23,9 +23,11 @@ data_query预计得分: 97.24
 [35b] 0.06/0.17
 [40] 1.49/1.67
 """
+# 实测97.22
 
-# 生成600条SQL问题的submit_result.jsonl，耗时10:36
+# 生成600条SQL问题的submit_result.jsonl，耗时10:20
 Manager.export()
 
-# 生成sql数据集
+# TODO 数字是否确认为这个？
+# 生成sql数据集，耗时约7h左右（主要是28a、28b太久了）
 train_df, val_df, test_df = Manager.generate_dataset(10000, 1000, 1000)
