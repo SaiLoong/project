@@ -3,6 +3,11 @@
 # @author zhangshilong
 # @date 2024/7/7
 
+from transformers.trainer_pt_utils import LabelSmoother
+
+IGNORE_TOKEN_ID = LabelSmoother.ignore_index
+
+
 class Enum:
     @classmethod
     def items(cls):
@@ -45,3 +50,7 @@ class ColumnType(Enum):
     REAL = "REAL"
     INTEGER = "INTEGER"
     TIMESTAMP = "TIMESTAMP"
+
+
+class AdapterName(Enum):
+    NL2SQL = "nl2sql"

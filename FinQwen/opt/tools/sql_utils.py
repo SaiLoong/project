@@ -160,7 +160,7 @@ class Generator(metaclass=GeneratorMeta):
         records = [record for record in self.batch(*params_list, progress=progress) if record.answer]
         if (res := n - len(records)) > 0:
             print(f"聚类{self.abbr}有{res}个答案为None，重新生成")
-            records.extend(self.generate(res, progress=progress))
+            records += self.generate(res, progress=progress)
         return records
 
     @property
@@ -175,7 +175,8 @@ class Generator(metaclass=GeneratorMeta):
                 if not record.answer:
                     print(f"[警告！] 问题({record.question!r})没有查询到答案！SQL:\n{record.sql}")
 
-            self.cluster_df["答案"] = [record.answer for record in self._records]
+            df = pd.DataFrame([record.to_dict() for record in self._records]).drop(columns="问题")
+            self.cluster_df = pd.concat([self.cluster_df, df], axis=1)
 
     def print_records(self, *fields, expand_sql=False, endl=1):
         for index, record in enumerate(self.records):

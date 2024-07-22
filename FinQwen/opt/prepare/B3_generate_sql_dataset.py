@@ -28,6 +28,6 @@ data_query预计得分: 97.24
 # 生成600条SQL问题的submit_result.jsonl，耗时10:20
 Manager.export()
 
-# TODO 数字是否确认为这个？
+# TODO 数字要不要写进config？
 # 生成sql数据集，耗时约7h左右（主要是28a、28b太久了）
-train_df, val_df, test_df = Manager.generate_dataset(10000, 1000, 1000)
+train_df, validation_df, test_df = Manager.generate_dataset(10000, 1000, 1000)

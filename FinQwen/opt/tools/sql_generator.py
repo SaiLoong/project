@@ -2171,24 +2171,28 @@ class ManagerMeta(type):
                 print(f"[{gen.abbr}] {gen.verification_score}/{gen.expectation_score}")
 
     def export(cls):
-        # 28a、28b非常久，尤其28b一条问题需要4min+，单线程的话长时间导致CPU空闲，从13:19降至10:20
+        # 28a、28b非常久，尤其28b一条问题需要4min+，单线程的话长时间导致CPU空闲，从13:19降至10:20。GPU机器八核只需5min
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(gen.refresh_records, progress=False) for gen in cls.generator_list]
-            # 不能用as_complete(tqdm(futures)) ,进度条一致保持0不动
+            # 不能用as_complete(tqdm(futures)) ,进度条一直保持0不动
             [future.result() for future in tqdm(futures)]
 
+        # 保存为csv格式，用于后续检验模型微调效果
         cluster_df = pd.concat([gen.cluster_df for gen in cls.generator_list])
         assert len(cluster_df) == Config.SQL_QUESTION_NUM
+        cluster_df.sort_values(by="问题id", inplace=True)
+        File.dataframe_to_csv(cluster_df, Config.SQL_QUESTION_ANSWER_PATH)
+
+        # 保存为jsonl格式，用于提交
         df = pd.merge(cls.question_df, cluster_df[["问题id", "答案"]], how="left", on="问题id")
         df.fillna("", inplace=True)
         df.rename(columns={"问题id": "id", "问题": "question", "答案": "answer"}, inplace=True)
-
         score = str(cls.score).replace(".", "p")
         File.dataframe_to_jsonl(df, f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl")
 
-    def generate_dataset(cls, train_size, val_size, test_size):
+    def generate_dataset(cls, train_size, validation_size, test_size):
         # 10000-1000-1000耗时约7h左右（主要是28a、28b太久了）
-        total_size = train_size + val_size + test_size
+        total_size = train_size + validation_size + test_size
         gen_num = len(cls.generator_list)
         div, mod = divmod(total_size, gen_num)
         assigns = [div + int(i < mod) for i in range(gen_num)]
@@ -2198,16 +2202,16 @@ class ManagerMeta(type):
                        for gen, assign in zip(cls.generator_list, assigns)]
             df = pd.DataFrame([record.to_dict() for future in tqdm(futures) for record in future.result()])
 
-        train_df, val_test_df = train_test_split(df, train_size=train_size)
-        val_df, test_df = train_test_split(val_test_df, train_size=val_size)
+        train_df, validation_test_df = train_test_split(df, train_size=train_size)
+        validation_df, test_df = train_test_split(validation_test_df, train_size=validation_size)
         train_df.reset_index(drop=True, inplace=True)
-        val_df.reset_index(drop=True, inplace=True)
+        validation_df.reset_index(drop=True, inplace=True)
         test_df.reset_index(drop=True, inplace=True)
 
         File.dataframe_to_csv(train_df, Config.SQL_TRAIN_QUESTION_PATH)
-        File.dataframe_to_csv(val_df, Config.SQL_VAL_QUESTION_PATH)
+        File.dataframe_to_csv(validation_df, Config.SQL_VALIDATION_QUESTION_PATH)
         File.dataframe_to_csv(test_df, Config.SQL_TEST_QUESTION_PATH)
-        return train_df, val_df, test_df
+        return train_df, validation_df, test_df
 
 
 class Manager(metaclass=ManagerMeta):

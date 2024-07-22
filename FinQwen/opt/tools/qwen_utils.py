@@ -18,11 +18,13 @@ from typing import Union
 import torch
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.metrics import pairwise_distances as _pairwise_distances
+from tqdm import tqdm
 from transformers import PreTrainedModel
 from transformers import PreTrainedTokenizer
 
 # Types.
 TokensType = List[int]
+DEFAULT_SYSTEM = "You are a helpful assistant."
 
 
 def get_stop_words_ids(chat_format, tokenizer):
@@ -217,15 +219,12 @@ def decode_tokens(
         raise NotImplementedError(f"Unknown chat format {chat_format!r}")
 
 
-# 批量推理接口
-def batch(
+def _batch(
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizer,
         queries: List[str],
-        system: str = "You are a helpful assistant."
+        system: str = DEFAULT_SYSTEM
 ) -> List[str]:
-    assert tokenizer.padding_side == "left"
-
     # 虽然make_context会同时返回context_tokens，但是难以padding，还是得依赖tokenizer
     batch_raw_text = [
         make_context(
@@ -262,6 +261,26 @@ def batch(
     ]
 
     return batch_response
+
+
+# 批量推理接口
+def batch(
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizer,
+        queries: List[str],
+        system: str = DEFAULT_SYSTEM,
+        batch_size: Optional[int] = None
+) -> List[str]:
+    assert tokenizer.padding_side == "left"
+
+    if batch_size:
+        batch_response = list()
+        for start in tqdm(range(0, len(queries), batch_size)):
+            chunk = queries[start:start + batch_size]
+            batch_response += _batch(model, tokenizer, chunk, system)
+        return batch_response
+    else:
+        return _batch(model, tokenizer, queries, system)
 
 
 # ==============================================================================

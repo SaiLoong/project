@@ -12,12 +12,14 @@ from typing import Optional
 import pandas as pd
 import torch
 from matplotlib import pyplot as plt
+from peft import PeftModel
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 from transformers import AutoTokenizer
 from transformers import GenerationConfig
 from transformers import set_seed
 
+from constant import AdapterName
 from constant import Category
 from constant import ModelMode
 from constant import ModelName
@@ -83,10 +85,12 @@ class Config(metaclass=ConfigMeta):
     QUESTION_CLASSIFICATION_PATH = File.join(INTERMEDIATE_DIR, "A2_question_classification.csv")
     SQL_QUESTION_AGGREGATION_PATH = File.join(INTERMEDIATE_DIR, "sql_question_aggregation.csv")
     DATABASE_METADATA_PATH = File.join(INTERMEDIATE_DIR, "database_metadata.json")
+    SQL_QUESTION_ANSWER_PATH = File.join(INTERMEDIATE_DIR, "sql_question_answer.csv")
     SQL_DATASET_DIR = File.join(INTERMEDIATE_DIR, "sql_dataset")
     SQL_TRAIN_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_train_question.csv")
-    SQL_VAL_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_val_question.csv")
+    SQL_VALIDATION_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_validation_question.csv")
     SQL_TEST_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_test_question.csv")
+    ADAPTER_DIR = File.join(INTERMEDIATE_DIR, "adapter")
 
     MODEL_NAME = ModelName.TONGYI_FINANCE_14B_CHAT_INT4
 
@@ -111,6 +115,11 @@ class Config(metaclass=ConfigMeta):
         model_name = model_name or cls.MODEL_NAME
         assert model_name in ModelName.values()
         return File.join(cls.WORKSPACE_DIR, model_name)
+
+    @classmethod
+    def adapter_dir(cls, adapter_name: str):
+        assert adapter_name in AdapterName.values()
+        return File.join(cls.ADAPTER_DIR, adapter_name)
 
     @classmethod
     def get_question_df(cls, rename: bool = True):
@@ -158,13 +167,14 @@ class Config(metaclass=ConfigMeta):
     def get_database_metadata(cls):
         return File.json_load(cls.DATABASE_METADATA_PATH)
 
+    # TODO 这4个有没用
     @classmethod
     def get_sql_train_question_df(cls):
         return pd.read_csv(cls.SQL_TRAIN_QUESTION_PATH)
 
     @classmethod
-    def get_sql_val_question_df(cls):
-        return pd.read_csv(cls.SQL_VAL_QUESTION_PATH)
+    def get_sql_validation_question_df(cls):
+        return pd.read_csv(cls.SQL_VALIDATION_QUESTION_PATH)
 
     @classmethod
     def get_sql_test_question_df(cls):
@@ -172,7 +182,7 @@ class Config(metaclass=ConfigMeta):
 
     @classmethod
     def get_sql_question_dfs(cls):
-        return cls.get_sql_train_question_df(), cls.get_sql_val_question_df(), cls.get_sql_test_question_df()
+        return cls.get_sql_train_question_df(), cls.get_sql_validation_question_df(), cls.get_sql_test_question_df()
 
     @classmethod
     def get_tokenizer(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, **kwargs):
@@ -194,10 +204,12 @@ class Config(metaclass=ConfigMeta):
 
         return tokenizer
 
+    # TODO 调试期间，先用adapter_dir
     @classmethod
-    def get_model(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, device_map: str = "cuda",
-                  torch_dtype: Optional[str] = None, use_flash_attn: bool = True, use_dynamic_ntk: bool = True,
-                  use_logn_attn: bool = True, generation_config: Optional[Dict[str, str]] = None, **kwargs):
+    def get_model(cls, model_name: Optional[str] = None, adapter_dir: Optional[str] = None, mode: str = ModelMode.EVAL,
+                  device_map: str = "cuda", torch_dtype: Optional[str] = None, use_flash_attn: bool = True,
+                  use_dynamic_ntk: bool = True, use_logn_attn: bool = True, use_cache: Optional[bool] = None,
+                  generation_config: Optional[Dict[str, str]] = None, **kwargs):
         assert mode in ModelMode.values()
 
         model_name = model_name or cls.MODEL_NAME
@@ -215,11 +227,14 @@ class Config(metaclass=ConfigMeta):
         else:
             raise ValueError(f"{torch_dtype=} must be one of torch.float16, torch.bfloat16 or torch.float32")
 
+        if use_cache is None:
+            use_cache = mode == ModelMode.EVAL
+
         print(f"loading model {model_name}...")
         model = AutoModelForCausalLM.from_pretrained(
             model_dir, trust_remote_code=True, device_map=device_map, torch_dtype=torch_dtype, fp16=fp16, bf16=bf16,
             fp32=fp32, use_flash_attn=use_flash_attn, use_dynamic_ntk=use_dynamic_ntk, use_logn_attn=use_logn_attn,
-            **kwargs)
+            use_cache=use_cache, **kwargs)
         assert model.device.type == device_map
         assert model.dtype == torch_dtype
 
@@ -231,14 +246,20 @@ class Config(metaclass=ConfigMeta):
             # 使用exllama插件速度能x7+！！！但Int8用不了
             assert "exllama" in type(model.transformer.h[0].mlp.c_proj).__module__
 
-        if mode == ModelMode.EVAL:
-            model = model.eval()
+        model.train(mode == ModelMode.TRAIN)
 
+        # generation_config只在generate时使用，对训练没有影响
         generation_config = generation_config or dict()
         model.generation_config = cls.get_generation_config(model_name, **generation_config)
 
         # 添加batch方法
         model.batch = MethodType(batch, model)
+
+        # 用户需要保证model和adapter是配对的
+        if adapter_dir:
+            model = PeftModel.from_pretrained(model, model_id=adapter_dir)
+            model.merge_and_unload()
+            print(f"merge_and_unload {adapter_dir} successfully")
 
         return model
 

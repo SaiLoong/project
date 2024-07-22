@@ -9,6 +9,7 @@ import re
 import shutil
 import sqlite3
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime
 from time import time
 from types import TracebackType
 from typing import Any
@@ -19,6 +20,7 @@ from typing import Type
 
 import numpy as np
 import pandas as pd
+from pandas.errors import DatabaseError
 from tqdm import tqdm
 
 
@@ -158,6 +160,20 @@ class File:
         df.to_csv(path, index=index, *args, **kwargs)
 
 
+class Time:
+    FMT = "%Y-%m-%d %H:%M:%S"
+
+    @classmethod
+    def current_datetime(cls) -> datetime:
+        """datetime格式的当前时间"""
+        return datetime.now()
+
+    @classmethod
+    def current_time(cls, fmt: str = FMT) -> str:
+        """字符串格式的当前时间"""
+        return cls.current_datetime().strftime(fmt)
+
+
 class Timer:
     def __init__(self, verbose: bool = True):
         self._verbose = verbose
@@ -240,16 +256,21 @@ class Database:
     def __init__(self, database_path: str):
         self.database_path = database_path
 
-    def query(self, sql: str, *args, **kwargs) -> pd.DataFrame:
+    def query(self, sql: str, raise_error: bool = True, **kwargs) -> Optional[pd.DataFrame]:
         connection = sqlite3.connect(self.database_path)
-        return pd.read_sql(sql, connection, *args, **kwargs)
+        try:
+            return pd.read_sql(sql, connection, **kwargs)
+        except DatabaseError as e:
+            if raise_error:
+                raise e
+            else:
+                return None
 
     # 加了@cache的实例、sqlite3.Connection不能pickle，因此只能每次查询时新建连接（反正创建连接很快，而且sqlite3内部应该会维护连接线程池）
-    # notebook使用多进程时有小概率一开始就卡住，多试几次就好了
-    def batch_query(self, sqls: List[str], max_workers: int = os.cpu_count(), progress: bool = True,
-                    tqdm_desc: Optional[str] = None, *args, **kwargs) -> List[pd.DataFrame]:
+    def batch_query(self, sqls: List[str], raise_error: bool = True, max_workers: int = os.cpu_count(),
+                    progress: bool = True, tqdm_desc: Optional[str] = None, **kwargs) -> List[Optional[pd.DataFrame]]:
         with ProcessPoolExecutor(max_workers) as executor:
-            futures = [executor.submit(self.query, sql, *args, **kwargs) for sql in sqls]
+            futures = [executor.submit(self.query, sql, raise_error=raise_error, **kwargs) for sql in sqls]
             if progress:
                 futures = tqdm(futures, tqdm_desc)
             # as_completed(futures)是按执行完成顺序返回的
