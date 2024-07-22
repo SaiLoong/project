@@ -34,7 +34,7 @@ class Record(NamedTuple):
                 quote = '"""'
                 print(f"sql = {quote}\n{self.sql}\n{quote}", end=end)
             else:
-                print(f"{field} = {repr(self.__getattribute__(field))}", end=end)
+                print(f"{field} = {self.__getattribute__(field)!r}", end=end)
 
     def pretty_print(self, *fields):
         self.print(*fields, expand_sql=True, endl=2)
@@ -124,11 +124,11 @@ class Generator(metaclass=GeneratorMeta):
 
     def query(self, question):
         params = self.parse(question)
-        assert params, f"问题({repr(question)})与问题模板({repr(self.question_template)})不匹配"
+        assert params, f"问题({question!r})与问题模板({self.question_template!r})不匹配"
         record = self(**params)
 
         # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
-        assert question == record.question, f"输入问题({repr(question)})与生成问题({repr(record.question)})不一致"
+        assert question == record.question, f"输入问题({question!r})与生成问题({record.question!r})不一致"
         return record
 
     def batch(self, *params_list, progress=True):
@@ -146,13 +146,13 @@ class Generator(metaclass=GeneratorMeta):
         params_list = list()
         for question in questions:
             params = self.parse(question)
-            assert params, f"问题({repr(question)})与问题模板({repr(self.question_template)})不匹配"
+            assert params, f"问题({question!r})与问题模板({self.question_template!r})不匹配"
             params_list.append(params)
         records = self.batch(*params_list, progress=progress)
 
         for question, record in zip(questions, records):
             # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
-            assert question == record.question, f"输入问题({repr(question)})与生成问题({repr(record.question)})不一致"
+            assert question == record.question, f"输入问题({question!r})与生成问题({record.question!r})不一致"
         return records
 
     def generate(self, n, progress=True):
@@ -173,7 +173,7 @@ class Generator(metaclass=GeneratorMeta):
             self._records = self.batch_query(self.questions, progress=progress)
             for record in self._records:
                 if not record.answer:
-                    print(f"[警告！] 问题({repr(record.question)})没有查询到答案！SQL:\n{record.sql}")
+                    print(f"[警告！] 问题({record.question!r})没有查询到答案！SQL:\n{record.sql}")
 
             self.cluster_df["答案"] = [record.answer for record in self._records]
 
