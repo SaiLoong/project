@@ -11,6 +11,7 @@ from typing import Optional
 
 import pandas as pd
 import torch
+from datasets import load_dataset
 from matplotlib import pyplot as plt
 from peft import PeftModel
 from tqdm import tqdm
@@ -58,6 +59,9 @@ class Config(metaclass=ConfigMeta):
     DATABASE_RECORD_SAMPLE_NUM = 1000
     COLUMN_DISTINCT_VALUE_SAMPLE_NUM = 1000
     SQL_CLUSTER_NUM = 57
+    SQL_TRAIN_QUESTION_NUM = 6400
+    SQL_VALIDATION_QUESTION_NUM = 640
+    SQL_TEST_QUESTION_NUM = 640
 
     WORKSPACE_DIR = "/mnt/workspace"
 
@@ -167,22 +171,19 @@ class Config(metaclass=ConfigMeta):
     def get_database_metadata(cls):
         return File.json_load(cls.DATABASE_METADATA_PATH)
 
-    # TODO 这4个有没用
     @classmethod
-    def get_sql_train_question_df(cls):
-        return pd.read_csv(cls.SQL_TRAIN_QUESTION_PATH)
-
-    @classmethod
-    def get_sql_validation_question_df(cls):
-        return pd.read_csv(cls.SQL_VALIDATION_QUESTION_PATH)
-
-    @classmethod
-    def get_sql_test_question_df(cls):
-        return pd.read_csv(cls.SQL_TEST_QUESTION_PATH)
-
-    @classmethod
-    def get_sql_question_dfs(cls):
-        return cls.get_sql_train_question_df(), cls.get_sql_validation_question_df(), cls.get_sql_test_question_df()
+    def get_sql_dataset(cls):
+        dataset = load_dataset("csv", data_files=dict(
+            train=cls.SQL_TRAIN_QUESTION_PATH,
+            validation=cls.SQL_VALIDATION_QUESTION_PATH,
+            test=cls.SQL_TEST_QUESTION_PATH
+        ))
+        assert dataset.num_rows == dict(
+            train=cls.SQL_TRAIN_QUESTION_NUM,
+            validation=cls.SQL_VALIDATION_QUESTION_NUM,
+            test=cls.SQL_TEST_QUESTION_NUM
+        )
+        return dataset
 
     @classmethod
     def get_tokenizer(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, **kwargs):

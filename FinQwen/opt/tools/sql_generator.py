@@ -4,13 +4,14 @@
 # @date 2024/7/19
 
 import re
+from concurrent.futures import as_completed
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from random import choice
 from random import randint
+from random import shuffle
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 from config import Config
@@ -2171,9 +2172,13 @@ class ManagerMeta(type):
                 print(f"[{gen.abbr}] {gen.verification_score}/{gen.expectation_score}")
 
     def export(cls):
-        # 28a、28b非常久，尤其28b一条问题需要4min+，单线程的话长时间导致CPU空闲，从13:19降至10:20。GPU机器八核只需5min
+        # 因为28a、28b很慢且紧挨着，容易同时占据进程池导致CPU利用率低
+        generator_list = cls.generator_list.copy()
+        shuffle(generator_list)
+
+        # CPU机器四核10:20，GPU机器八核只需5min
         with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = [executor.submit(gen.refresh_records, progress=False) for gen in cls.generator_list]
+            futures = [executor.submit(gen.refresh_records, progress=False) for gen in generator_list]
             # 不能用as_complete(tqdm(futures)) ,进度条一直保持0不动
             [future.result() for future in tqdm(futures)]
 
@@ -2190,28 +2195,25 @@ class ManagerMeta(type):
         score = str(cls.score).replace(".", "p")
         File.dataframe_to_jsonl(df, f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl")
 
-    def generate_dataset(cls, train_size, validation_size, test_size):
-        # 10000-1000-1000耗时约7h左右（主要是28a、28b太久了）
-        total_size = train_size + validation_size + test_size
-        gen_num = len(cls.generator_list)
-        div, mod = divmod(total_size, gen_num)
+    def generate(cls, num):
+        # 因为28a、28b很慢且紧挨着，容易同时占据进程池导致CPU利用率低
+        generator_list = cls.generator_list.copy()
+        shuffle(generator_list)
+
+        gen_num = len(generator_list)
+        div, mod = divmod(num, gen_num)
         assigns = [div + int(i < mod) for i in range(gen_num)]
 
+        # 随机生成的SQL很容易查不到答案，因此有大量时间浪费在重复生成上
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(gen.generate, assign, progress=False)
-                       for gen, assign in zip(cls.generator_list, assigns)]
-            df = pd.DataFrame([record.to_dict() for future in tqdm(futures) for record in future.result()])
+                       for gen, assign in zip(generator_list, assigns)]
+            df = pd.DataFrame([record.to_dict()
+                               # 打印日志过多时tqdm会出问题不更新，加不加as_completed都一样
+                               for future in tqdm(as_completed(futures), total=gen_num)
+                               for record in future.result()])
 
-        train_df, validation_test_df = train_test_split(df, train_size=train_size)
-        validation_df, test_df = train_test_split(validation_test_df, train_size=validation_size)
-        train_df.reset_index(drop=True, inplace=True)
-        validation_df.reset_index(drop=True, inplace=True)
-        test_df.reset_index(drop=True, inplace=True)
-
-        File.dataframe_to_csv(train_df, Config.SQL_TRAIN_QUESTION_PATH)
-        File.dataframe_to_csv(validation_df, Config.SQL_VALIDATION_QUESTION_PATH)
-        File.dataframe_to_csv(test_df, Config.SQL_TEST_QUESTION_PATH)
-        return train_df, validation_df, test_df
+        return df.sample(frac=1, ignore_index=True)  # 打乱顺序
 
 
 class Manager(metaclass=ManagerMeta):

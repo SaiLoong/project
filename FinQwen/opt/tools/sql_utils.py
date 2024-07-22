@@ -132,14 +132,15 @@ class Generator(metaclass=GeneratorMeta):
         return record
 
     def batch(self, *params_list, progress=True):
-        params_list, questions, sqls = zip(*[self._get_params_question_sql(params) for params in params_list])
-        raw_results = self.database.batch_query(sqls, progress=progress,
-                                                tqdm_desc=f"聚类{self.abbr}/{Config.SQL_CLUSTER_NUM}")
-
         records = list()
-        for params, question, sql, raw_result in zip(params_list, questions, sqls, raw_results):
-            result = raw_result.to_dict(orient="records")
-            records.append(self._get_record(params, question, sql, result))
+        if params_list:
+            params_list, questions, sqls = zip(*[self._get_params_question_sql(params) for params in params_list])
+            raw_results = self.database.batch_query(sqls, progress=progress,
+                                                    tqdm_desc=f"聚类{self.abbr}/{Config.SQL_CLUSTER_NUM}")
+
+            for params, question, sql, raw_result in zip(params_list, questions, sqls, raw_results):
+                result = raw_result.to_dict(orient="records")
+                records.append(self._get_record(params, question, sql, result))
         return records
 
     def batch_query(self, questions, progress=True):
@@ -155,10 +156,10 @@ class Generator(metaclass=GeneratorMeta):
             assert question == record.question, f"输入问题({question!r})与生成问题({record.question!r})不一致"
         return records
 
-    def generate(self, n, progress=True):
-        params_list = [dict()] * n
+    def generate(self, num, progress=True):
+        params_list = [dict()] * num
         records = [record for record in self.batch(*params_list, progress=progress) if record.answer]
-        if (res := n - len(records)) > 0:
+        if (res := num - len(records)) > 0:
             print(f"聚类{self.abbr}有{res}个答案为None，重新生成")
             records += self.generate(res, progress=progress)
         return records

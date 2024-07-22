@@ -3,7 +3,9 @@
 # @author zhangshilong
 # @date 2024/7/19
 
+from ..tools.config import Config
 from ..tools.sql_generator import Manager
+from ..tools.utils import File
 
 # 先人工为57个聚类的问题编写对应的Generator放到tools.sql_generator.py, 并利用export方法校验正确性
 
@@ -28,6 +30,12 @@ data_query预计得分: 97.24
 # 生成600条SQL问题的submit_result.jsonl，耗时10:20
 Manager.export()
 
-# TODO 数字要不要写进config？
-# 生成sql数据集，耗时约7h左右（主要是28a、28b太久了）
-train_df, validation_df, test_df = Manager.generate_dataset(10000, 1000, 1000)
+# 生成sql数据集
+train_df = Manager.generate(Config.SQL_TRAIN_QUESTION_NUM)
+File.dataframe_to_csv(train_df, Config.SQL_TRAIN_QUESTION_PATH)
+
+validation_df = Manager.generate(Config.SQL_VALIDATION_QUESTION_NUM)
+File.dataframe_to_csv(validation_df, Config.SQL_VALIDATION_QUESTION_PATH)
+
+test_df = Manager.generate(Config.SQL_TEST_QUESTION_NUM)
+File.dataframe_to_csv(test_df, Config.SQL_TEST_QUESTION_PATH)

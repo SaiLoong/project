@@ -5,7 +5,6 @@
 
 import warnings
 
-from datasets import load_dataset
 from peft import get_peft_model
 from peft import LoraConfig
 from peft import TaskType
@@ -53,11 +52,7 @@ model.print_trainable_parameters()
 # 数据部分
 
 
-ds = load_dataset("csv", data_files={
-    "train": Config.SQL_TRAIN_QUESTION_PATH,  # 10000
-    "validation": Config.SQL_VALIDATION_QUESTION_PATH,  # 1000
-    "test": Config.SQL_TEST_QUESTION_PATH  # 1000
-})
+ds = Config.get_sql_dataset()
 
 
 def func(example):
