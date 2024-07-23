@@ -21,10 +21,12 @@ from sklearn.metrics import pairwise_distances as _pairwise_distances
 from tqdm import tqdm
 from transformers import PreTrainedModel
 from transformers import PreTrainedTokenizer
+from transformers.trainer_pt_utils import LabelSmoother
 
 # Types.
 TokensType = List[int]
 DEFAULT_SYSTEM = "You are a helpful assistant."
+IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 
 
 def get_stop_words_ids(chat_format, tokenizer):
@@ -285,6 +287,19 @@ def batch(
 
 # ==============================================================================
 # tokenizer部分
+
+
+# 将微调文本转化为模型输入
+def make_finetune_inputs(tokenizer, prompt, answer, system=DEFAULT_SYSTEM):
+    _, input_ids_a = make_context(tokenizer, prompt, system=system)
+    dct_b = tokenizer(f"{answer}<|im_end|>\n")
+
+    # 结尾没有加eod_token，但是以"<|im_end|>\n"结尾
+    return dict(
+        input_ids=input_ids_a + dct_b["input_ids"],
+        attention_mask=[1] * len(input_ids_a) + dct_b["attention_mask"],
+        labels=[IGNORE_TOKEN_ID] * len(input_ids_a) + dct_b["input_ids"]
+    )
 
 
 # 解码词元列表时，并不合并成一个长字符串

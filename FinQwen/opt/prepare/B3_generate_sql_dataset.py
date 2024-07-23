@@ -9,6 +9,8 @@ from ..tools.utils import File
 
 # 先人工为57个聚类的问题编写对应的Generator放到tools.sql_generator.py, 并利用export方法校验正确性
 
+
+# =====================================================================================================
 # 输出整体校验结果
 Manager.analysis()
 """
@@ -27,18 +29,23 @@ data_query预计得分: 97.24
 """
 # 实测97.22
 
+
+# =====================================================================================================
 # 生成600条SQL问题的submit_result.jsonl，耗时10:20
-Manager.export()
+Manager.export_submit_result()
 
-# 生成sql数据集
-# 1:32:00
-train_df = Manager.generate(Config.SQL_TRAIN_QUESTION_NUM)
-File.dataframe_to_csv(train_df, Config.SQL_TRAIN_QUESTION_PATH)
+# =====================================================================================================
+# 生成nl2sql数据集
+train_df = Manager.generate_nl2sql_dataset(Config.NL2SQL_TRAIN_DATASET_NUM)
+File.dataframe_to_csv(train_df, Config.NL2SQL_TRAIN_DATASET_PATH)
 
-# 11:51
-validation_df = Manager.generate(Config.SQL_VALIDATION_QUESTION_NUM)
-File.dataframe_to_csv(validation_df, Config.SQL_VALIDATION_QUESTION_PATH)
+validation_df = Manager.generate_nl2sql_dataset(Config.NL2SQL_VALIDATION_DATASET_NUM)
+File.dataframe_to_csv(validation_df, Config.NL2SQL_VALIDATION_DATASET_PATH)
 
-# 15:12
-test_df = Manager.generate(Config.SQL_TEST_QUESTION_NUM)
-File.dataframe_to_csv(test_df, Config.SQL_TEST_QUESTION_PATH)
+test_df = Manager.generate_nl2sql_dataset(Config.NL2SQL_TEST_DATASET_NUM)
+File.dataframe_to_csv(test_df, Config.NL2SQL_TEST_DATASET_PATH)
+
+# =====================================================================================================
+# 生成sql_answer的prompt example
+example_df = Manager.generate_sql_prompt_example(Config.SQL_PROMPT_EXAMPLE_NUM)
+File.dataframe_to_csv(example_df, Config.SQL_PROMPT_EXAMPLE_PATH)

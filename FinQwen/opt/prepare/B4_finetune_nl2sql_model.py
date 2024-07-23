@@ -3,6 +3,7 @@
 # @author zhangshilong
 # @date 2024/7/19
 
+import os
 import warnings
 
 from peft import get_peft_model
@@ -16,7 +17,7 @@ from transformers import TrainingArguments
 from ..tools.config import Config
 from ..tools.constant import ModelMode
 from ..tools.constant import ModelName
-from ..tools.nl2sql_utils import build_finetune_data
+from ..tools.utils import File
 from ..tools.utils import Time
 
 # 這些警告已确认与用户使用无关，大多是Qwen的问题
@@ -37,10 +38,16 @@ model = Config.get_model(model_name, mode=mode)
 lora_config = LoraConfig(
     # 不加的话最后的model是PeftModel，加了是PeftModelForCausalLM，看代码貌似没有什么关键改动，但是以防万一加上吧
     task_type=TaskType.CAUSAL_LM,
-    # 之前demo的参数是r=8, lora_alpha=32, lora_dropout=0.1
-    r=64,
-    lora_alpha=16,
-    lora_dropout=0.05,
+
+    # finetune
+    # r=64,
+    # lora_alpha=16,
+    # lora_dropout=0.05,
+
+    # demo
+    r=8,
+    lora_alpha=32,
+    lora_dropout=0.1,
     target_modules=["c_attn", "c_proj", "w1", "w2"]
 )
 
@@ -52,26 +59,19 @@ model.print_trainable_parameters()
 # 数据部分
 
 
-ds = Config.get_sql_dataset()
-
-
-def func(example):
-    question = example["问题"]
-    sql = example["SQL"]
-    return build_finetune_data(tokenizer, question, sql)
-
-
-dataset = ds.map(func, remove_columns=ds.column_names["train"], num_proc=4)
-train_dataset = dataset["train"]
-validation_dataset = dataset["validation"]
-test_dataset = dataset["test"]
+dataset = Config.get_nl2sql_dataset()
+dataset = dataset.map(lambda example: tokenizer.make_finetune_inputs(example["问题"], example["SQL"]),
+                      remove_columns=dataset.column_names["train"], num_proc=os.cpu_count())
+train_dataset = dataset["train"]  # 25600
+validation_dataset = dataset["validation"]  # 640
+test_dataset = dataset["test"]  # 640
 
 # ================================================================================================
 # 训练部分
 
 # 按训练时间分文件夹，避免覆盖之前训练的模型
 fmt = "%Y%m%d_%H%M%S"
-output_dir = f"{Config.PREPARE_OUTPUT_DIR}/nl2sql_lora/{Time.current_time(fmt)}"
+output_dir = f"{Config.NL2SQL_FINETUNE_DIR}/{Time.current_time(fmt)}"
 print(f"{output_dir=}")
 
 training_args = TrainingArguments(
@@ -79,24 +79,24 @@ training_args = TrainingArguments(
     seed=Config.SEED,
 
     # 训练
-    num_train_epochs=10,  # 反正有early stop
+    num_train_epochs=5,  # 有early stop
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
     gradient_checkpointing=True,
 
     # 验证
     evaluation_strategy="steps",
-    eval_steps=50,
+    eval_steps=200,
     per_device_eval_batch_size=16,
 
     # 日志
     # logging_strategy="steps",  # 默认就是这个
-    logging_steps=50,  # 使用notebook时，如果开启了eval，只有进行eval的step才会打印日志
+    logging_steps=200,  # 使用notebook时，如果开启了eval，只有进行eval的step才会打印日志
 
     # 保存
     # save_strategy="steps",  # 默认就是这个
-    save_steps=50,  # 和eval保持一致
-    save_total_limit=4,
+    save_steps=200,  # 和eval保持一致
+    save_total_limit=2,
     load_best_model_at_end=True,
 
     # 超参数
@@ -118,24 +118,68 @@ trainer = Trainer(
 
 trainer.train()
 
-trainer.save_model(f"{output_dir}/best")
-
-# 将挑选好checkpoint拷贝至intermediate/adapter/nl2sql
+# trainer.save_model(f"{output_dir}/best")
 
 
 # ================================================================================================
 # 测试部分
 
+
 trainer.evaluate(test_dataset)
 
-# TODO
-"""
-1.8B 20240722_151706
-    bs=16，在2450 step验证集最小(0.000256，约4w样本，4epoch)，总耗时1:09:22
-    显存22348M，接近爆了；GPU利用率稳定在98%左右
+# ================================================================================================
+# ================================================================================================
+# 直接执行B5的逻辑
 
-7B 20240722_181022
-    bs=4*4，在1000 step验证集最小(0.000287，约1.6w样本，1.6epoch)，总耗时1:38:11
-   20240722_200616
-    lora参数改小了，1650 step, 0.000274, 2:46:10
-"""
+
+db = Config.get_database()
+answer_df = Config.get_sql_question_answer_df()
+
+pred_df = answer_df.drop(columns=["问题聚类", "答案"])
+question_num = len(pred_df)
+questions = pred_df["问题"].tolist()
+# true_sqls = pred_df["SQL"].tolist()
+# true_results = pred_df["SQL结果"].tolist()
+
+
+# =====================================================================================
+# 预测sql
+
+tokenizer.padding_side = "left"  # 批量推理必须为左填充
+pred_sqls = model.batch(tokenizer, questions, batch_size=8)
+pred_df["预测SQL"] = pred_sqls
+
+pred_df["SQL正确"] = pred_df["SQL"] == pred_df["预测SQL"]
+sql_correct_num = sum(pred_df["SQL正确"])
+print(f"测试问题数：{question_num}")  # 600
+print(f"SQL正确数：{sql_correct_num}")
+print(f"SQL正确率：{sql_correct_num / question_num:.2%}")
+# 展示bad case
+pred_df.query("SQL正确 == False")
+
+# =====================================================================================
+# 执行sql
+
+
+pred_results = [
+    None if raw_result is None else str(raw_result.to_dict(orient="records"))
+    for raw_result in db.batch_query(pred_sqls, raise_error=False)
+]
+pred_df["预测SQL结果"] = pred_results
+
+pred_df["结果正确"] = pred_df["SQL结果"] == pred_df["预测SQL结果"]
+execute_num = sum(pred_df["预测SQL结果"].notnull())
+result_correct_num = sum(pred_df["结果正确"])
+print(f"测试问题数：{question_num}")  # 600
+print(f"成功执行数：{execute_num}")
+print(f"成功执行率：{execute_num / question_num:.2%}")
+print(f"结果正确数：{result_correct_num}")
+print(f"结果正确率：{result_correct_num / question_num:.2%}")
+print(f"结果正确/成功执行：{result_correct_num / execute_num:.2%}")
+# 展示bad case
+pred_df.query("结果正确 == False")
+
+# =====================================================================================
+
+# 保存下来，不要浪费
+File.dataframe_to_csv(pred_df, f"{output_dir}/nl2sql_evaluate.csv")

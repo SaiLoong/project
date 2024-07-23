@@ -8,6 +8,7 @@ from functools import partialmethod
 from types import MethodType
 from typing import Dict
 from typing import Optional
+from typing import Union
 
 import pandas as pd
 import torch
@@ -20,7 +21,6 @@ from transformers import AutoTokenizer
 from transformers import GenerationConfig
 from transformers import set_seed
 
-from constant import AdapterName
 from constant import Category
 from constant import ModelMode
 from constant import ModelName
@@ -28,6 +28,7 @@ from qwen_utils import batch
 from qwen_utils import batch_decode_each
 from qwen_utils import cut
 from qwen_utils import decode_each
+from qwen_utils import make_finetune_inputs
 from qwen_utils import pairwise_jaccard_distances
 from qwen_utils import pairwise_jaccard_scores
 from utils import Database
@@ -60,9 +61,10 @@ class Config(metaclass=ConfigMeta):
     COLUMN_DISTINCT_VALUE_SAMPLE_NUM = 1000
     SQL_CLUSTER_NUM = 57
     SQL_GENERATOR_NUM = 64
-    SQL_TRAIN_QUESTION_NUM = SQL_GENERATOR_NUM * 100
-    SQL_VALIDATION_QUESTION_NUM = SQL_GENERATOR_NUM * 10
-    SQL_TEST_QUESTION_NUM = SQL_GENERATOR_NUM * 10
+    NL2SQL_TRAIN_DATASET_NUM = SQL_GENERATOR_NUM * 400
+    NL2SQL_VALIDATION_DATASET_NUM = SQL_GENERATOR_NUM * 10
+    NL2SQL_TEST_DATASET_NUM = SQL_GENERATOR_NUM * 10
+    SQL_PROMPT_EXAMPLE_NUM = SQL_GENERATOR_NUM * 10
 
     WORKSPACE_DIR = "/mnt/workspace"
 
@@ -81,6 +83,7 @@ class Config(metaclass=ConfigMeta):
 
     PREPARE_DIR = File.join(WORKSPACE_DIR, "prepare")
     PREPARE_OUTPUT_DIR = File.join(PREPARE_DIR, "output")
+    NL2SQL_FINETUNE_DIR = File.join(PREPARE_OUTPUT_DIR, "nl2sql_finetune")
 
     INTERMEDIATE_DIR = File.join(WORKSPACE_DIR, "intermediate")
     COMPANY_PATH = File.join(INTERMEDIATE_DIR, "A1_cid_to_company.csv")
@@ -91,11 +94,11 @@ class Config(metaclass=ConfigMeta):
     SQL_QUESTION_AGGREGATION_PATH = File.join(INTERMEDIATE_DIR, "sql_question_aggregation.csv")
     DATABASE_METADATA_PATH = File.join(INTERMEDIATE_DIR, "database_metadata.json")
     SQL_QUESTION_ANSWER_PATH = File.join(INTERMEDIATE_DIR, "sql_question_answer.csv")
-    SQL_DATASET_DIR = File.join(INTERMEDIATE_DIR, "sql_dataset")
-    SQL_TRAIN_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_train_question.csv")
-    SQL_VALIDATION_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_validation_question.csv")
-    SQL_TEST_QUESTION_PATH = File.join(SQL_DATASET_DIR, "sql_test_question.csv")
-    ADAPTER_DIR = File.join(INTERMEDIATE_DIR, "adapter")
+    NL2SQL_DATASET_DIR = File.join(INTERMEDIATE_DIR, "nl2sql_dataset")
+    NL2SQL_TRAIN_DATASET_PATH = File.join(NL2SQL_DATASET_DIR, "nl2sql_train_dataset.csv")
+    NL2SQL_VALIDATION_DATASET_PATH = File.join(NL2SQL_DATASET_DIR, "nl2sql_validation_dataset.csv")
+    NL2SQL_TEST_DATASET_PATH = File.join(NL2SQL_DATASET_DIR, "nl2sql_test_dataset.csv")
+    SQL_PROMPT_EXAMPLE_PATH = File.join(INTERMEDIATE_DIR, "sql_prompt_example.csv")
 
     MODEL_NAME = ModelName.TONGYI_FINANCE_14B_CHAT_INT4
 
@@ -122,9 +125,10 @@ class Config(metaclass=ConfigMeta):
         return File.join(cls.WORKSPACE_DIR, model_name)
 
     @classmethod
-    def adapter_dir(cls, adapter_name: str):
-        assert adapter_name in AdapterName.values()
-        return File.join(cls.ADAPTER_DIR, adapter_name)
+    def nl2sql_adapter_dir(cls, date: str, step: Union[str, int]):
+        adapter_dir = File.join(cls.NL2SQL_FINETUNE_DIR, date, f"checkpoint-{step}")
+        assert File.isdir(adapter_dir)
+        return adapter_dir
 
     @classmethod
     def get_question_df(cls, rename: bool = True):
@@ -173,16 +177,22 @@ class Config(metaclass=ConfigMeta):
         return File.json_load(cls.DATABASE_METADATA_PATH)
 
     @classmethod
-    def get_sql_dataset(cls):
+    def get_sql_question_answer_df(cls):
+        sql_question_answer_df = pd.read_csv(cls.SQL_QUESTION_ANSWER_PATH)
+        assert len(sql_question_answer_df) == cls.SQL_QUESTION_NUM
+        return sql_question_answer_df
+
+    @classmethod
+    def get_nl2sql_dataset(cls):
         dataset = load_dataset("csv", data_files=dict(
-            train=cls.SQL_TRAIN_QUESTION_PATH,
-            validation=cls.SQL_VALIDATION_QUESTION_PATH,
-            test=cls.SQL_TEST_QUESTION_PATH
+            train=cls.NL2SQL_TRAIN_DATASET_PATH,
+            validation=cls.NL2SQL_VALIDATION_DATASET_PATH,
+            test=cls.NL2SQL_TEST_DATASET_PATH
         ))
         assert dataset.num_rows == dict(
-            train=cls.SQL_TRAIN_QUESTION_NUM,
-            validation=cls.SQL_VALIDATION_QUESTION_NUM,
-            test=cls.SQL_TEST_QUESTION_NUM
+            train=cls.NL2SQL_TRAIN_DATASET_NUM,
+            validation=cls.NL2SQL_VALIDATION_DATASET_NUM,
+            test=cls.NL2SQL_TEST_DATASET_NUM
         )
         return dataset
 
@@ -198,6 +208,7 @@ class Config(metaclass=ConfigMeta):
         tokenizer.pad_token_id = tokenizer.eod_id
 
         # 添加方法
+        tokenizer.make_finetune_inputs = MethodType(make_finetune_inputs, tokenizer)
         tokenizer.decode_each = MethodType(decode_each, tokenizer)
         tokenizer.batch_decode_each = MethodType(batch_decode_each, tokenizer)
         tokenizer.cut = MethodType(cut, tokenizer)
@@ -206,9 +217,8 @@ class Config(metaclass=ConfigMeta):
 
         return tokenizer
 
-    # TODO 调试期间，先用adapter_dir
     @classmethod
-    def get_model(cls, model_name: Optional[str] = None, adapter_dir: Optional[str] = None, mode: str = ModelMode.EVAL,
+    def get_model(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, adapter_dir: Optional[str] = None,
                   device_map: str = "cuda", torch_dtype: Optional[str] = None, use_flash_attn: bool = True,
                   use_dynamic_ntk: bool = True, use_logn_attn: bool = True, use_cache: Optional[bool] = None,
                   generation_config: Optional[Dict[str, str]] = None, **kwargs):
@@ -279,6 +289,16 @@ class Config(metaclass=ConfigMeta):
     @classmethod
     def get_database(cls):
         return Database(cls.DATABASE_PATH)
+
+    @classmethod
+    def export_submit_result(cls, df: pd.DataFrame, path: str):
+        assert path.endswith("submit_result.jsonl")
+
+        question_df = cls.get_question_df()
+        submit_df = pd.merge(question_df, df[["问题id", "答案"]], how="left", on="问题id")
+        submit_df.fillna("", inplace=True)
+        submit_df.rename(columns={"问题id": "id", "问题": "question", "答案": "answer"}, inplace=True)
+        File.dataframe_to_jsonl(submit_df, path)
 
     @classmethod
     def set_seed(cls, seed: Optional[int] = None) -> None:

@@ -80,7 +80,6 @@ class Generator(metaclass=GeneratorMeta):
         assert self.answer_template.endswith("。"), "答案模板结尾没有加上句号"
 
         self.database = Config.get_database()
-        self.question_df = Config.get_question_df()
         self.aggregation_df = Config.get_sql_question_aggregation_df()
         self.cluster_df = self._get_cluster_df()
         self.questions = self.cluster_df["问题"].tolist()
@@ -134,16 +133,15 @@ class Generator(metaclass=GeneratorMeta):
         assert question == record.question, f"输入问题({question!r})与生成问题({record.question!r})不一致"
         return record
 
-    def batch(self, *params_list, progress=True):
-        records = list()
-        if params_list:
-            params_list, questions, sqls = zip(*[self._get_params_question_sql(params) for params in params_list])
-            raw_results = self.database.batch_query(sqls, progress=progress,
-                                                    tqdm_desc=f"聚类{self.abbr}/{Config.SQL_CLUSTER_NUM}")
+    def batch(self, params_list, progress=True):
+        params_list, questions, sqls = zip(*[self._get_params_question_sql(params) for params in params_list])
+        raw_results = self.database.batch_query(sqls, progress=progress,
+                                                tqdm_desc=f"聚类{self.abbr}/{Config.SQL_CLUSTER_NUM}")
 
-            for params, question, sql, raw_result in zip(params_list, questions, sqls, raw_results):
-                result = raw_result.to_dict(orient="records")
-                records.append(self._get_record(params, question, sql, result))
+        records = list()
+        for params, question, sql, raw_result in zip(params_list, questions, sqls, raw_results):
+            result = raw_result.to_dict(orient="records")
+            records.append(self._get_record(params, question, sql, result))
         return records
 
     def batch_query(self, questions, progress=True):
@@ -152,19 +150,22 @@ class Generator(metaclass=GeneratorMeta):
             params = self.parse(question)
             assert params, f"问题({question!r})与问题模板({self.question_template!r})不匹配"
             params_list.append(params)
-        records = self.batch(*params_list, progress=progress)
+        records = self.batch(params_list, progress=progress)
 
         for question, record in zip(questions, records):
             # 防止preprocess_params逻辑有问题，只顾着随机没有优先取输入参数
             assert question == record.question, f"输入问题({question!r})与生成问题({record.question!r})不一致"
         return records
 
-    def generate(self, num, progress=True):
+    def generate_params_question_sql(self, num):
+        return [self._get_params_question_sql(dict()) for _ in range(num)]
+
+    def generate_records(self, num, progress=True):
         params_list = [dict()] * num
-        records = [record for record in self.batch(*params_list, progress=progress) if record.answer]
+        records = [record for record in self.batch(params_list, progress=progress) if record.answer]
         if (res := num - len(records)) > 0:
             print(f"聚类{self.abbr}有{res}个答案为None，重新生成")
-            records += self.generate(res, progress=progress)
+            records += self.generate_records(res, progress=progress)
         return records
 
     @property
@@ -189,11 +190,9 @@ class Generator(metaclass=GeneratorMeta):
 
     def export(self):
         self.refresh_records()
-        df = pd.merge(self.question_df, self.cluster_df[["问题id", "答案"]], how="left", on="问题id")
-        df.fillna("", inplace=True)
-        df.rename(columns={"问题id": "id", "问题": "question", "答案": "answer"}, inplace=True)
 
         score = str(self.expectation_score).replace(".", "p")
         generator_dir = f"{Config.PREPARE_OUTPUT_DIR}/generator"
         File.makedirs(generator_dir)
-        File.dataframe_to_jsonl(df, f"{generator_dir}/{self.abbr}_{self.question_num}_{score}_submit_result.jsonl")
+        path = f"{generator_dir}/{self.abbr}_{self.question_num}_{score}_submit_result.jsonl"
+        Config.export_submit_result(self.cluster_df, path)

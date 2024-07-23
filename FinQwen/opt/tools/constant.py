@@ -3,11 +3,6 @@
 # @author zhangshilong
 # @date 2024/7/7
 
-from transformers.trainer_pt_utils import LabelSmoother
-
-IGNORE_TOKEN_ID = LabelSmoother.ignore_index
-
-
 class Enum:
     @classmethod
     def items(cls):
@@ -29,7 +24,7 @@ class ModelName(Enum):
     QWEN_1_8B_CHAT = "Qwen-1_8B-Chat"
     QWEN_7B_CHAT = "Qwen-7B-Chat"
     QWEN_14B_CHAT_INT4 = "Qwen-14B-Chat-Int4"
-    QWEN_14B_CHAT_INT8 = "Qwen-14B-Chat-Int8"
+    # QWEN_14B_CHAT_INT8 = "Qwen-14B-Chat-Int8"
 
     # TONGYI_FINANCE_14B_CHAT = "Tongyi-Finance-14B-Chat"
     TONGYI_FINANCE_14B_CHAT_INT4 = "Tongyi-Finance-14B-Chat-Int4"
@@ -50,7 +45,3 @@ class ColumnType(Enum):
     REAL = "REAL"
     INTEGER = "INTEGER"
     TIMESTAMP = "TIMESTAMP"
-
-
-class AdapterName(Enum):
-    NL2SQL = "nl2sql"

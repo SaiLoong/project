@@ -2129,7 +2129,6 @@ class ManagerMeta(type):
         cls.generator_list = sum([list(v.values()) for v in generator_dict.values()], list())  # 64个
         assert len(cls.generator_list) == Config.SQL_GENERATOR_NUM
         assert sum(gen.question_num for gen in cls.generator_list) == Config.SQL_QUESTION_NUM
-        cls.question_df = Config.get_question_df()
         cls.score = round(sum([gen.verification_score for gen in cls.generator_list]), 2)  # 97.24，实测97.22
 
     def analysis(cls):
@@ -2141,7 +2140,7 @@ class ManagerMeta(type):
             if diff >= 0.1:
                 print(f"[{gen.abbr}] {gen.verification_score}/{gen.expectation_score}")
 
-    def export(cls):
+    def export_submit_result(cls):
         # 因为28a、28b很慢且紧挨着，容易同时占据进程池导致CPU利用率低
         generator_list = cls.generator_list.copy()
         shuffle(generator_list)
@@ -2159,20 +2158,33 @@ class ManagerMeta(type):
         File.dataframe_to_csv(cluster_df, Config.SQL_QUESTION_ANSWER_PATH)
 
         # 保存为jsonl格式，用于提交
-        df = pd.merge(cls.question_df, cluster_df[["问题id", "答案"]], how="left", on="问题id")
-        df.fillna("", inplace=True)
-        df.rename(columns={"问题id": "id", "问题": "question", "答案": "answer"}, inplace=True)
         score = str(cls.score).replace(".", "p")
-        File.dataframe_to_jsonl(df, f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl")
+        path = f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl"
+        Config.export_submit_result(cluster_df, path)
 
-    def generate(cls, num):
+    def generate_nl2sql_dataset(cls, num):
+        div, mod = divmod(num, Config.SQL_GENERATOR_NUM)
+        assigns = [div + int(i < mod) for i in range(Config.SQL_GENERATOR_NUM)]
+
+        records = list()
+        for gen, assign in zip(cls.generator_list, assigns):
+            records += gen.generate_params_question_sql(assign)
+        params_list, questions, sqls = zip(*records)
+        df = pd.DataFrame({
+            "问题": questions,
+            "SQL": sqls
+        })
+
+        return df.sample(frac=1, ignore_index=True)  # 打乱顺序
+
+    def generate_sql_prompt_example(cls, num):
         div, mod = divmod(num, Config.SQL_GENERATOR_NUM)
         assigns = [div + int(i < mod) for i in range(Config.SQL_GENERATOR_NUM)]
 
         # 随机生成的SQL很容易查不到答案，因此有大量时间浪费在重复生成上
         with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = [executor.submit(gen.generate, assign, progress=False)
-                       for gen, assign in zip(cls.generator_list, assigns)]
+            futures = [executor.submit(gen.generate_records, assign, progress=False)
+                       for gen, assign in zip(cls.generator_list, assigns) if assign > 0]
             # 打印日志过多时tqdm会不更新，加不加as_completed都一样
             df = pd.DataFrame([record.to_dict() for future in tqdm(futures) for record in future.result()])
 
