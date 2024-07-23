@@ -31,11 +31,14 @@ data_query预计得分: 97.24
 Manager.export()
 
 # 生成sql数据集
+# 1:32:00
 train_df = Manager.generate(Config.SQL_TRAIN_QUESTION_NUM)
 File.dataframe_to_csv(train_df, Config.SQL_TRAIN_QUESTION_PATH)
 
+# 11:51
 validation_df = Manager.generate(Config.SQL_VALIDATION_QUESTION_NUM)
 File.dataframe_to_csv(validation_df, Config.SQL_VALIDATION_QUESTION_PATH)
 
+# 15:12
 test_df = Manager.generate(Config.SQL_TEST_QUESTION_NUM)
 File.dataframe_to_csv(test_df, Config.SQL_TEST_QUESTION_PATH)

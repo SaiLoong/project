@@ -4,7 +4,6 @@
 # @date 2024/7/19
 
 import re
-from concurrent.futures import as_completed
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from random import choice
@@ -929,11 +928,6 @@ class Generator21(Generator):
             sign=compare_to_sign[compare]
         )
 
-    def postprocess_result(self, result, params):
-        # SUM一定返回一行记录，但值有可能是None
-        result = result[0]
-        return None if result["比例"] is None else result
-
 
 @dataclass
 class Generator22(Generator):
@@ -1036,11 +1030,6 @@ class Generator24(Generator):
             role=role or choice(roles),
             percent=percent or randint(1, 100)
         )
-
-    def postprocess_result(self, result, params):
-        # SUM一定返回一行记录，但值有可能是None
-        result = result[0]
-        return None if result["持有份额"] is None else result
 
 
 @dataclass
@@ -1222,11 +1211,6 @@ class Generator29(Generator):
             industry2=industry2 or choice_from_column(table2, "二级行业名称")
         )
 
-    def postprocess_result(self, result, params):
-        # AVG一定返回一行记录，但值有可能是None
-        result = result[0]
-        return None if result["平均市值"] is None else result
-
 
 @dataclass
 class Generator30(Generator):
@@ -1352,11 +1336,6 @@ class Generator33(Generator):
             monthday=season_to_monthday[season]
         )
 
-    def postprocess_result(self, result, params):
-        # SUM一定返回一行记录，但值有可能是None
-        result = result[0]
-        return None if result["净赎回份额"] is None else result
-
 
 @dataclass
 class Generator34(Generator):
@@ -1390,11 +1369,6 @@ class Generator34(Generator):
             season=season,
             monthday=season_to_monthday[season]
         )
-
-    def postprocess_result(self, result, params):
-        # SUM一定返回一行记录，但值有可能是None
-        result = result[0]
-        return None if result["净申购份额"] is None else result
 
 
 @dataclass
@@ -1925,11 +1899,6 @@ class Generator48(Generator):
             industry2=industry2 or choice_from_column(table, "二级行业名称")
         )
 
-    def postprocess_result(self, result, params):
-        # AVG一定返回一行记录，但值有可能是None
-        result = result[0]
-        return None if result["平均成交金额"] is None else result
-
 
 @dataclass
 class Generator49(Generator):
@@ -2158,6 +2127,7 @@ class ManagerMeta(type):
         assert len(generator_dict) == Config.SQL_CLUSTER_NUM
         cls.generator_dict = generator_dict
         cls.generator_list = sum([list(v.values()) for v in generator_dict.values()], list())  # 64个
+        assert len(cls.generator_list) == Config.SQL_GENERATOR_NUM
         assert sum(gen.question_num for gen in cls.generator_list) == Config.SQL_QUESTION_NUM
         cls.question_df = Config.get_question_df()
         cls.score = round(sum([gen.verification_score for gen in cls.generator_list]), 2)  # 97.24，实测97.22
@@ -2196,22 +2166,15 @@ class ManagerMeta(type):
         File.dataframe_to_jsonl(df, f"{Config.PREPARE_OUTPUT_DIR}/sql_{score}_submit_result.jsonl")
 
     def generate(cls, num):
-        # 因为28a、28b很慢且紧挨着，容易同时占据进程池导致CPU利用率低
-        generator_list = cls.generator_list.copy()
-        shuffle(generator_list)
-
-        gen_num = len(generator_list)
-        div, mod = divmod(num, gen_num)
-        assigns = [div + int(i < mod) for i in range(gen_num)]
+        div, mod = divmod(num, Config.SQL_GENERATOR_NUM)
+        assigns = [div + int(i < mod) for i in range(Config.SQL_GENERATOR_NUM)]
 
         # 随机生成的SQL很容易查不到答案，因此有大量时间浪费在重复生成上
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(gen.generate, assign, progress=False)
-                       for gen, assign in zip(generator_list, assigns)]
-            df = pd.DataFrame([record.to_dict()
-                               # 打印日志过多时tqdm会出问题不更新，加不加as_completed都一样
-                               for future in tqdm(as_completed(futures), total=gen_num)
-                               for record in future.result()])
+                       for gen, assign in zip(cls.generator_list, assigns)]
+            # 打印日志过多时tqdm会不更新，加不加as_completed都一样
+            df = pd.DataFrame([record.to_dict() for future in tqdm(futures) for record in future.result()])
 
         return df.sample(frac=1, ignore_index=True)  # 打乱顺序
 

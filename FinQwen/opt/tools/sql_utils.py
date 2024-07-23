@@ -98,7 +98,10 @@ class Generator(metaclass=GeneratorMeta):
         raise NotImplementedError
 
     def postprocess_result(self, result, params):
-        return result[0] if result else None
+        if result:
+            result = result[0]
+            return None if None in result.values() else result
+        return None
 
     def parse(self, question):
         try:
