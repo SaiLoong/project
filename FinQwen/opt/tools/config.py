@@ -99,6 +99,9 @@ class Config(metaclass=ConfigMeta):
     NL2SQL_VALIDATION_DATASET_PATH = File.join(NL2SQL_DATASET_DIR, "nl2sql_validation_dataset.csv")
     NL2SQL_TEST_DATASET_PATH = File.join(NL2SQL_DATASET_DIR, "nl2sql_test_dataset.csv")
     SQL_PROMPT_EXAMPLE_PATH = File.join(INTERMEDIATE_DIR, "sql_prompt_example.csv")
+    SQL_RESULT_PREDICTION_PATH = File.join(INTERMEDIATE_DIR, "B1_sql_result_prediction.csv")
+    SQL_ANSWER_PREDICTION_PATH = File.join(INTERMEDIATE_DIR, "B2_sql_answer_prediction.csv")
+    SQL_SUBMIT_RESULT_PATH = File.join(INTERMEDIATE_DIR, "B2_sql_submit_result.jsonl")
 
     MODEL_NAME = ModelName.TONGYI_FINANCE_14B_CHAT_INT4
 
@@ -212,6 +215,18 @@ class Config(metaclass=ConfigMeta):
         sql_prompt_example_df = pd.read_csv(cls.SQL_PROMPT_EXAMPLE_PATH)
         assert len(sql_prompt_example_df) == cls.SQL_PROMPT_EXAMPLE_NUM
         return sql_prompt_example_df
+
+    @classmethod
+    def get_sql_result_prediction_df(cls):
+        sql_result_prediction_df = pd.read_csv(cls.SQL_RESULT_PREDICTION_PATH)
+        assert len(sql_result_prediction_df) == cls.SQL_QUESTION_NUM
+        return sql_result_prediction_df
+
+    @classmethod
+    def get_sql_answer_prediction_df(cls):
+        sql_answer_prediction_df = pd.read_csv(cls.SQL_ANSWER_PREDICTION_PATH)
+        assert len(sql_answer_prediction_df) == cls.SQL_QUESTION_NUM
+        return sql_answer_prediction_df
 
     @classmethod
     def get_tokenizer(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, **kwargs):
