@@ -40,14 +40,14 @@ lora_config = LoraConfig(
     task_type=TaskType.CAUSAL_LM,
 
     # finetune
-    # r=64,
-    # lora_alpha=16,
-    # lora_dropout=0.05,
+    r=64,
+    lora_alpha=16,
+    lora_dropout=0.05,
 
     # demo
-    r=8,
-    lora_alpha=32,
-    lora_dropout=0.1,
+    # r=8,
+    # lora_alpha=32,
+    # lora_dropout=0.1,
     target_modules=["c_attn", "c_proj", "w1", "w2"]
 )
 
@@ -58,13 +58,27 @@ model.print_trainable_parameters()
 # ================================================================================================
 # 数据部分
 
+system = "你是一名Mysql数据库开发人员。"
+prompt_template = """任务描述：
+你精通Mysql数据库的sql代码编写，你需要根据给定的问题编写sql代码。
+为了确保sql代码可执行，你必须保证sql代码语法没有错误（例如左右括号数量一致）。
 
-dataset = Config.get_nl2sql_dataset()
-dataset = dataset.map(lambda example: tokenizer.make_finetune_inputs(example["问题"], example["SQL"]),
-                      remove_columns=dataset.column_names["train"], num_proc=os.cpu_count())
-train_dataset = dataset["train"]  # 25600
-validation_dataset = dataset["validation"]  # 640
-test_dataset = dataset["test"]  # 640
+问题：{question}
+sql代码："""
+
+
+def func(example):
+    question = example["问题"]
+    sql = example["SQL"]
+    prompt = prompt_template.format(question=question)
+    return tokenizer.make_finetune_inputs(prompt, sql, system=system)
+
+
+dataset = Config.get_nl2sql_dataset_v2()
+dataset = dataset.map(func, remove_columns=dataset.column_names["train"], num_proc=os.cpu_count())
+train_dataset = dataset["train"]  # 10000
+validation_dataset = dataset["validation"]  # 1000
+test_dataset = dataset["test"]  # 1000
 
 # ================================================================================================
 # 训练部分
@@ -79,23 +93,23 @@ training_args = TrainingArguments(
     seed=Config.SEED,
 
     # 训练
-    num_train_epochs=5,  # 有early stop
+    num_train_epochs=4,  # 有early stop
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
     gradient_checkpointing=True,
 
     # 验证
     evaluation_strategy="steps",
-    eval_steps=200,
+    eval_steps=50,
     per_device_eval_batch_size=16,
 
     # 日志
     # logging_strategy="steps",  # 默认就是这个
-    logging_steps=200,  # 使用notebook时，如果开启了eval，只有进行eval的step才会打印日志
+    logging_steps=50,  # 使用notebook时，如果开启了eval，只有进行eval的step才会打印日志
 
     # 保存
     # save_strategy="steps",  # 默认就是这个
-    save_steps=200,  # 和eval保持一致
+    save_steps=50,  # 和eval保持一致
     save_total_limit=2,
     load_best_model_at_end=True,
 
@@ -113,7 +127,7 @@ trainer = Trainer(
     train_dataset=train_dataset,
     eval_dataset=validation_dataset,
     data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer),
-    callbacks=[EarlyStoppingCallback(early_stopping_patience=5)]
+    callbacks=[EarlyStoppingCallback(early_stopping_patience=10)]
 )
 
 trainer.train()
@@ -146,7 +160,10 @@ questions = pred_df["问题"].tolist()
 # 预测sql
 
 tokenizer.padding_side = "left"  # 批量推理必须为左填充
-pred_sqls = model.batch(tokenizer, questions, batch_size=8)
+prompts = [prompt_template.format(question=question) for question in questions]
+print(prompts[0])
+
+pred_sqls = model.batch(tokenizer, prompts, system=system, batch_size=8)
 pred_df["预测SQL"] = pred_sqls
 
 pred_df["SQL正确"] = pred_df["SQL"] == pred_df["预测SQL"]

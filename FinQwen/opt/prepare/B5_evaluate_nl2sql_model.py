@@ -10,7 +10,7 @@ from ..tools.utils import File
 model_name = ModelName.QWEN_7B_CHAT
 tokenizer = Config.get_tokenizer(model_name)
 
-adapter_dir = Config.nl2sql_adapter_dir(date="20240724_005557", step=1000)  # TODO step
+adapter_dir = Config.nl2sql_adapter_dir(version="20240724_041234", step=600)
 model = Config.get_model(model_name, adapter_dir=adapter_dir)
 
 # =====================================================================================
@@ -64,6 +64,7 @@ print(f"结果正确/成功执行：{result_correct_num / execute_num:.2%}")
 pred_df.query("结果正确 == False")
 
 # =====================================================================================
+
 
 # 保存下来，不要浪费
 File.dataframe_to_csv(pred_df, f"{adapter_dir}/nl2sql_evaluate.csv")

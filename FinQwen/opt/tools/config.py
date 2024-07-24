@@ -125,8 +125,8 @@ class Config(metaclass=ConfigMeta):
         return File.join(cls.WORKSPACE_DIR, model_name)
 
     @classmethod
-    def nl2sql_adapter_dir(cls, date: str, step: Union[str, int]):
-        adapter_dir = File.join(cls.NL2SQL_FINETUNE_DIR, date, f"checkpoint-{step}")
+    def nl2sql_adapter_dir(cls, version: str, step: Union[str, int]):
+        adapter_dir = File.join(cls.NL2SQL_FINETUNE_DIR, version, f"checkpoint-{step}")
         assert File.isdir(adapter_dir)
         return adapter_dir
 
@@ -195,6 +195,23 @@ class Config(metaclass=ConfigMeta):
             test=cls.NL2SQL_TEST_DATASET_NUM
         )
         return dataset
+
+    # 发现用一开始生成的10000数据集比25600、6400效果好得多
+    @classmethod
+    def get_nl2sql_dataset_v2(cls):
+        dataset_dir = "/mnt/workspace/intermediate/_nl2sql_dataset_10000"
+        dataset = load_dataset("csv", data_files={
+            "train": f"{dataset_dir}/nl2sql_train_dataset.csv",  # 10000
+            "validation": f"{dataset_dir}/nl2sql_validation_dataset.csv",  # 1000
+            "test": f"{dataset_dir}/nl2sql_test_dataset.csv"  # 1000
+        })
+        return dataset
+
+    @classmethod
+    def get_sql_prompt_example_df(cls):
+        sql_prompt_example_df = pd.read_csv(cls.SQL_PROMPT_EXAMPLE_PATH)
+        assert len(sql_prompt_example_df) == cls.SQL_PROMPT_EXAMPLE_NUM
+        return sql_prompt_example_df
 
     @classmethod
     def get_tokenizer(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, **kwargs):
