@@ -251,7 +251,7 @@ class Config(metaclass=ConfigMeta):
 
     @classmethod
     def get_model(cls, model_name: Optional[str] = None, mode: str = ModelMode.EVAL, adapter_dir: Optional[str] = None,
-                  device_map: str = "cuda", torch_dtype: Optional[str] = None, use_flash_attn: bool = True,
+                  device_map: str = "cuda", torch_dtype: Optional[str] = None, use_flash_attn: Optional[bool] = None,
                   use_dynamic_ntk: bool = True, use_logn_attn: bool = True, use_cache: Optional[bool] = None,
                   generation_config: Optional[Dict[str, str]] = None, **kwargs):
         assert mode in ModelMode.values()
@@ -270,6 +270,9 @@ class Config(metaclass=ConfigMeta):
             fp16, bf16, fp32 = False, False, True
         else:
             raise ValueError(f"{torch_dtype=} must be one of torch.float16, torch.bfloat16 or torch.float32")
+
+        if use_flash_attn is None:
+            use_flash_attn = "cuda" in device_map
 
         if use_cache is None:
             use_cache = mode == ModelMode.EVAL
