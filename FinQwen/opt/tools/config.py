@@ -163,10 +163,22 @@ class Config(metaclass=ConfigMeta):
         return classification_test_question_df
 
     @classmethod
-    def get_question_classification_df(cls):
+    def get_question_classification_df(cls, category: Optional[str] = None):
         question_classification_df = pd.read_csv(cls.QUESTION_CLASSIFICATION_PATH)
         assert len(question_classification_df) == cls.QUESTION_NUM
-        assert len(question_classification_df.query(f"问题分类 == '{Category.TEXT}'")) == cls.TEXT_QUESTION_NUM
+
+        if category:
+            assert category in Category.values()
+            question_classification_df.query(f"问题分类 == '{category}'", inplace=True)
+            question_classification_df.reset_index(drop=True, inplace=True)
+            question_classification_df.drop(columns="问题分类", inplace=True)
+
+            if category == Category.TEXT:
+                assert len(question_classification_df) == cls.TEXT_QUESTION_NUM
+            else:
+                assert len(question_classification_df) == cls.SQL_QUESTION_NUM
+                question_classification_df.drop(columns=["公司名称", "公司id"], inplace=True)
+
         return question_classification_df
 
     @classmethod

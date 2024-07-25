@@ -16,9 +16,7 @@ tokenizer = Config.get_tokenizer(model_name)
 adapter_dir = Config.nl2sql_adapter_dir(version="20240724_165829", step=950)  # 最好的checkpoint
 model = Config.get_model(model_name, adapter_dir=adapter_dir)
 
-question_classification_df = Config.get_question_classification_df()
-question_df = question_classification_df.query(f"问题分类 == '{Category.SQL}'").reset_index()[
-    ["问题id", "问题"]]  # 600条
+question_df = Config.get_question_classification_df(category=Category.SQL)  # 600条
 questions = question_df["问题"].tolist()
 
 # 生成sql，耗时11:11
