@@ -89,6 +89,7 @@ class Config(metaclass=ConfigMeta):
     COMPANY_PATH = File.join(INTERMEDIATE_DIR, "A1_cid_to_company.csv")
     COMPANY_PDF_DIR = File.join(INTERMEDIATE_DIR, "pdf")
     COMPANY_TXT_DIR = File.join(INTERMEDIATE_DIR, "txt")
+    COMPANY_PDF2TXT_DIR = File.join(INTERMEDIATE_DIR, "pdf2txt")
     CLASSIFICATION_TEST_QUESTION_PATH = File.join(INTERMEDIATE_DIR, "classification_test_question.csv")
     QUESTION_CLASSIFICATION_PATH = File.join(INTERMEDIATE_DIR, "A2_question_classification.csv")
     SQL_QUESTION_AGGREGATION_PATH = File.join(INTERMEDIATE_DIR, "sql_question_aggregation.csv")
@@ -120,6 +121,10 @@ class Config(metaclass=ConfigMeta):
             return File.join(cls.CID_TXT_DIR, f"{cid}.txt")
         else:
             return File.join(cls.COMPANY_TXT_DIR, f"{company}.txt")
+
+    @classmethod
+    def company_pdf2txt_path(cls, company: str):
+        return File.join(cls.COMPANY_PDF2TXT_DIR, f"{company}.txt")
 
     @classmethod
     def model_dir(cls, model_name: Optional[str] = None):
