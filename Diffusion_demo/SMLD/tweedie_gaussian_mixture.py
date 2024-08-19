@@ -80,7 +80,7 @@ def get_posteriori_prob(thetas, x):
 def guess_posteriori_dist(x):
     n = len(x)
     sigma0_2 = sigma ** 2 / n
-    avg_x = sum(x) / n
+    avg_x = x.mean()
 
     sigma0_m2 = 1 / sigma0_2
     taus_m2 = 1 / taus ** 2
@@ -148,7 +148,7 @@ plot_pdf(target_dist, label="target")
 
 # 假设有一个观测样本x
 x = torch.tensor([0], dtype=torch.float, device=device)
-sns.scatterplot(x=x.cpu(), y=0, marker="o", color="purple")
+sns.scatterplot(x=x.cpu(), y=0, color="purple")
 
 plot_posteriori_pdf(x)
 
@@ -159,12 +159,12 @@ plot_posteriori_pdf(x)
 
 theta = tweedie(x)
 print(f"x={x.item():.4f} -> theta={theta.item():.4f}\n")
-sns.scatterplot(x=theta.cpu(), y=0, marker="o", color="red")
+sns.scatterplot(x=theta.cpu(), y=0, color="red")
 plt.show()
 
 # ===============================================================================
 
 
 plot_target_score()
-sns.scatterplot(x=x.cpu(), y=target_score(x).cpu(), marker="o", color="purple")
+sns.scatterplot(x=x.cpu(), y=target_score(x).cpu(), color="purple")
 plt.show()

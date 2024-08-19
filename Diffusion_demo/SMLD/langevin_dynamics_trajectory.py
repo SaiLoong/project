@@ -100,7 +100,7 @@ quantiles = xs.quantile(torch.tensor([0.01, 0.5, 0.99], device=device))
 
 plot_pdf(true_dist, label="true")
 # 逐个点画的话很耗时
-sns.scatterplot(x=xs.cpu(), y=prob.cpu(), marker="o", color="red")
+sns.scatterplot(x=xs.cpu(), y=prob.cpu(), color="red")
 plt.vlines(quantiles.cpu(), -0.05, 0.4, colors="black", linestyles="--")
 plt.show()
 
@@ -113,7 +113,7 @@ plt.show()
 plot_score(true_dist, label="true_score")
 point_xs = torch.cat([quantiles, x0])
 point_ys = get_score(true_dist, point_xs)
-sns.scatterplot(x=point_xs.cpu(), y=point_ys.cpu(), marker="o", color="red")
+sns.scatterplot(x=point_xs.cpu(), y=point_ys.cpu(), color="red")
 
 for point_x, point_y in zip(point_xs.tolist(), point_ys.tolist()):
     plt.annotate(f"({point_x:.2f}, {point_y:.2f})", (point_x, point_y))

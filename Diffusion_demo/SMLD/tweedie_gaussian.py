@@ -129,7 +129,7 @@ plot_pdf(target_dist, label="target")
 
 # 假设有一个观测样本x
 x = torch.tensor([5], dtype=torch.float, device=device)
-sns.scatterplot(x=x.cpu(), y=0, marker="o", color="purple")
+sns.scatterplot(x=x.cpu(), y=0, color="purple")
 
 # 两条后验曲线重合
 posteriori_dist = get_posteriori_dist(x)
@@ -139,12 +139,12 @@ plot_pdf(posteriori_dist, label="posteriori")
 # 由于正态分布的特殊性，修正后的值刚好就是后验概率的顶点
 theta = tweedie(x)
 print(f"x={x.item():.4f} -> theta={theta.item():.4f}\n")
-sns.scatterplot(x=theta.cpu(), y=0, marker="o", color="red")
+sns.scatterplot(x=theta.cpu(), y=0, color="red")
 plt.show()
 
 # ===============================================================================
 
 
 plot_target_score()
-sns.scatterplot(x=x.cpu(), y=target_score(x).cpu(), marker="o", color="purple")
+sns.scatterplot(x=x.cpu(), y=target_score(x).cpu(), color="purple")
 plt.show()

@@ -33,6 +33,6 @@ for _ in range(N):
     points_t.append(point_t)
     points_x.append(point_x)
 
-sns.scatterplot(x=points_t, y=points_x, marker="o", color="black")
+sns.scatterplot(x=points_t, y=points_x, color="black")
 
 plt.show()

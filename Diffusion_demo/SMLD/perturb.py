@@ -15,8 +15,8 @@ true_pis = torch.tensor([0.8, 0.2], dtype=torch.float, device=device)
 true_mus = torch.tensor([5, -5], dtype=torch.float, device=device)
 true_taus = torch.tensor([1, 1], dtype=torch.float, device=device)
 
-x_min = -10
-x_max = 10
+x_min = -10.
+x_max = 10.
 
 
 # ===============================================================================
@@ -72,6 +72,37 @@ def plot_score(dist, _x_min=x_min, _x_max=x_max, interval=0.01, range_as=None, l
     plt.hlines(0, _x_min, _x_max, colors="black", linestyles="--")
 
 
+def plot_score_ratio(dists, _x_min=x_min, _x_max=x_max, interval=0.01, range_as=None):
+    if range_as is not None:
+        _x_min = min(range_as).item()
+        _x_max = max(range_as).item()
+
+    x = torch.arange(_x_min, _x_max, interval, device=device)
+
+    baseline_dist = get_perturb_dist(1)
+    baseline_score = get_score(baseline_dist, x)
+
+    avg_ratios = dict()
+    for noise_sigma, dist in dists.items():
+        score = get_score(dist, x)
+        ratio = score / baseline_score
+        avg_ratios[noise_sigma] = ratio.mean().item()
+        sns.lineplot(x=x.cpu(), y=ratio.cpu(), label=f"perturb {noise_sigma=:}")
+    plt.hlines(0, _x_min, _x_max, colors="black", linestyles="--")
+    plt.show()
+
+    sns.lineplot(avg_ratios)
+    sns.scatterplot(avg_ratios, color="red")
+    for noise_sigma, avg_ratio in avg_ratios.items():
+        plt.annotate(f"({noise_sigma:.1f}, {avg_ratio:.2f})", (noise_sigma, avg_ratio))
+
+    # 对比曲线，找出sigma的次数
+    # sigmas = torch.arange(min(avg_ratios), max(avg_ratios), interval)
+    # ys = sigmas ** -1
+    # sns.lineplot(x=sigmas, y=ys)
+    # plt.show()
+
+
 # =====================================================================================
 
 
@@ -79,7 +110,7 @@ def plot_score(dist, _x_min=x_min, _x_max=x_max, interval=0.01, range_as=None, l
 true_dist = get_true_dist()
 
 # 扰动数据分布
-noise_sigmas = [0.1, 1, 2]
+noise_sigmas = [0.1, 0.2, 0.5, 1, 2, 5, 10]
 perturb_dists = {noise_sigma: get_perturb_dist(noise_sigma) for noise_sigma in noise_sigmas}
 
 # 密度曲线对比
@@ -94,4 +125,5 @@ for noise_sigma, perturb_dist in perturb_dists.items():
     plot_score(perturb_dist, label=f"perturb {noise_sigma=:}")
 plt.show()
 
-# TODO 分数随\sigma变化的比例
+# 分数随噪声变化的比例
+plot_score_ratio(perturb_dists, 0, 4)

@@ -96,6 +96,7 @@ true_dist = get_true_dist()
 # 初始分布
 init_dist = get_init_dist()
 data = init_dist.sample([sample_size]).requires_grad_(True)
+plt.title("init")
 plot_pdf(true_dist, label="true")
 sns.histplot(data.detach().cpu(), stat="density", binwidth=0.1)
 plt.show()
@@ -103,11 +104,12 @@ plt.show()
 for i in range(1, L + 1):
     sigma_i = sigma(i)
     alpha_i = epsilon * sigma_i ** 2 / sigma_L ** 2
-    print(f"[{i=}] {sigma_i=:.4f} {alpha_i=:.4f}")
+    print(f"sigma_{i}={sigma_i:.2f} alpha_{i}={alpha_i:.2f}")
 
     perturb_dist = get_perturb_dist(sigma_i)
     data = langevin_dynamics(data, perturb_dist, alpha_i)
 
+    plt.title(f"sigma_{i}={sigma_i:.2f}      alpha_{i}={alpha_i:.2f}")
     plot_pdf(true_dist, label="true")
     plot_pdf(perturb_dist, range_as=data, label="perturb")
     sns.histplot(data.detach().cpu(), stat="density", binwidth=0.1)
