@@ -98,6 +98,17 @@ def get_xt_dist(t):
     return get_gaussian_mixture_dist(xt_pis, xt_mus, xt_taus)
 
 
+def get_xtm1_from_xt_and_x0_dist(xt, x0, t):
+    xt = convert(xt)
+    x0 = convert(x0)
+
+    mu = (torch.sqrt(alpha(t)) * (1 - bar_alpha(t - 1)) * xt +
+          torch.sqrt(bar_alpha(t - 1)) * (1 - alpha(t)) * x0) \
+         / (1 - bar_alpha(t))
+    sigma = torch.sqrt((1 - alpha(t)) * (1 - bar_alpha(t - 1)) / (1 - bar_alpha(t)))
+    return get_gaussian_dist(mu, sigma)
+
+
 def get_x0_from_xt_prob(x0, xt, t):
     x0 = convert(x0)
     xt = convert(xt)
@@ -241,22 +252,26 @@ def between_x0_and_xt(t, x0, xt):
     plt.show()
 
 
-# 展示xtm1和xt之间的四个分布
-def between_xtm1_and_xt(t, xtm1, xt):
+# 展示xtm1和xt之间的四个分布，外加q(xtm1|xt,x0)
+def between_xtm1_and_xt(t, xtm1, xt, x0=None, x_min=X_MIN, x_max=X_MAX):
     xtm1_dist = get_xt_dist(t - 1)
-    plot_dist_pdf(xtm1_dist, label=f"x{t - 1}")
+    plot_dist_pdf(xtm1_dist, x_min, x_max, label=f"x{t - 1}")
 
     xt_dist = get_xt_dist(t)
-    plot_dist_pdf(xt_dist, label=f"x{t}")
+    plot_dist_pdf(xt_dist, x_min, x_max, label=f"x{t}")
 
     xt_from_xtm1_dist = get_xt_from_xtm1_dist(xtm1=xtm1, t=t)
-    plot_dist_pdf(xt_from_xtm1_dist, label=f"x{t}_from_x{t - 1}")
+    plot_dist_pdf(xt_from_xtm1_dist, x_min, x_max, label=f"x{t}_from_x{t - 1}")
 
     xtm1_from_xt_pdf = partial(get_xtm1_from_xt_prob, xt=xt, t=t)
-    plot_pdf(xtm1_from_xt_pdf, label=f"x{t - 1}_from_x{t}")
+    plot_pdf(xtm1_from_xt_pdf, x_min, x_max, label=f"x{t - 1}_from_x{t}")
+
+    if x0 is not None:
+        xtm1_from_xt_and_x0_dist = get_xtm1_from_xt_and_x0_dist(xt, x0, t)
+        plot_dist_pdf(xtm1_from_xt_and_x0_dist, x_min, x_max, label=f"x{t - 1}_from_x{t}_and_x0")
 
     standard_gaussian_dist = get_gaussian_dist(0, 1)
-    plot_dist_pdf(standard_gaussian_dist, label="standard_gaussian")
+    plot_dist_pdf(standard_gaussian_dist, x_min, x_max, label="standard_gaussian")
 
     plt.show()
 
@@ -296,7 +311,7 @@ def show_x0_from_xt_evolution(T, xt, step=1, x_min=X_MIN, x_max=X_MAX):
 # verify_xtm1_from_xt(xtm1=2, t=50)
 
 # between_x0_and_xt(t=200, x0=2, xt=4)
-between_xtm1_and_xt(t=10, xtm1=2, xt=4)
+between_xtm1_and_xt(t=10, xtm1=2, xt=4, x0=0, x_min=-5, x_max=5)
 
 # show_xt_evolution(T=101, step=20)
 # show_x0_from_xt_evolution(T=200, xt=-5, step=50, x_min=-15, x_max=15)
