@@ -87,10 +87,11 @@ plot_pdf(true_dist, label="true")
 sns.histplot(x.detach().cpu(), stat="density", binwidth=0.1)
 plt.show()
 
+chunk = int(T / 10)
 for t in trange(1, T + 1):
     x = langevin_dynamics_step(x, true_dist, add_noise=True)
 
-    if t % 10 == 0:
+    if t % chunk == 0:
         plt.title(f"{t=}")
         plot_pdf(true_dist, label="true")
         sns.histplot(x.detach().cpu(), stat="density", binwidth=0.1)
