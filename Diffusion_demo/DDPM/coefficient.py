@@ -6,7 +6,14 @@
 import math
 from functools import cache
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 ALPHA = 0.95
+
+T_MAX = 1000
+ALPHA_1 = 1 - 1e-4
+ALPHA_T = 1 - 0.02
 
 
 @cache
@@ -16,8 +23,9 @@ def temp(t):
 
 @cache
 def alpha(t):
-    return ALPHA
+    # return ALPHA
     # return temp(t) / temp(t - 1)
+    return (ALPHA_T - ALPHA_1) / (T_MAX - 1) * (t - 1) + ALPHA_1
 
 
 @cache
@@ -27,10 +35,7 @@ def beta(t):
 
 @cache
 def alpha_prod(t):
-    if t == 0:
-        return 1
-    else:
-        return alpha(t) * alpha_prod(t - 1)
+    return 1 if t == 0 else alpha(t) * alpha_prod(t - 1)
 
 
 @cache
@@ -114,7 +119,10 @@ def score_coefficient2(t):
     return (1 - alpha(t)) / (math.sqrt(alpha(t)))
 
 
-for t in range(2, 1000, 50):
+# ===============================================================================
+
+
+for t in range(1, 1 + 1, 1):
     # print(
     #     f"{t=} {alpha(t)=:.4f} {alpha_prod(t)=:.4f} {SNR(t)=:.4f} {sigma2(t)=:.4f} || "
     #     f"{picture_weight_v1(t):.4f} {picture_weight_v2(t):.4f} || "
@@ -125,3 +133,20 @@ for t in range(2, 1000, 50):
           f"{picture_coefficient1(t):.4f} {picture_coefficient2(t):.4f} || "
           f"{noise_coefficient1(t):.4f} {noise_coefficient2(t):.4f} || "
           f"{score_coefficient1(t):.4f} {score_coefficient2(t):.4f}")
+
+
+def plot(coefficient, T, label=None):
+    coefficients = [coefficient(t) for t in range(1, T + 1, 1)]
+    sns.lineplot(coefficients, label=label)
+
+
+T = 10
+plot(sigma, T, label="sigma")
+plot(picture_coefficient1, T, label="picture_coefficient1")
+plot(picture_coefficient2, T, label="picture_coefficient2")
+plot(noise_coefficient1, T, label="noise_coefficient1")
+plot(noise_coefficient2, T, label="noise_coefficient2")
+plot(score_coefficient1, T, label="score_coefficient1")
+plot(score_coefficient2, T, label="score_coefficient2")
+
+plt.show()
