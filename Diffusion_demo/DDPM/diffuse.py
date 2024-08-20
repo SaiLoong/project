@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file loss.py
+# @file diffuse.py
 # @author zhangshilong
 # @date 2024/8/19
 
@@ -13,9 +13,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 x_min = -15
 x_max = 15
 
-pis = torch.tensor([0.5, 0.2, 0.3], dtype=torch.float, device=device)
-mus = torch.tensor([-7, 6, 10], dtype=torch.float, device=device)
-taus = torch.tensor([1, 0.7, 1.3], dtype=torch.float, device=device)
+pis = torch.tensor([0.2, 0.2, 0.3, 0.1, 0.2], dtype=torch.float, device=device)
+mus = torch.tensor([-9, -5, 2, 6, 10], dtype=torch.float, device=device)
+taus = torch.tensor([1, 0.7, 1.3, 0.8, 2.2], dtype=torch.float, device=device)
 
 # 只能取(0, 1)
 alpha = torch.tensor(0.1, dtype=torch.float, device=device)
@@ -54,9 +54,9 @@ def get_xt_dist():
     xt_pis = pis
     xt_mus = torch.sqrt(alpha) * mus
     xt_taus = torch.sqrt(alpha * taus ** 2 + 1 - alpha)
-    print(f"xt_pis={tensor_tolist(xt_pis)} "
-          f"xt_mus={tensor_tolist(xt_mus)} "
-          f"xt_taus={tensor_tolist(xt_taus)}\n")
+    # print(f"xt_pis={tensor_tolist(xt_pis)} "
+    #       f"xt_mus={tensor_tolist(xt_mus)} "
+    #       f"xt_taus={tensor_tolist(xt_taus)}\n")
 
     return gaussian_mixture(xt_pis, xt_mus, xt_taus)
 
