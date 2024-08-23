@@ -42,3 +42,4 @@ trainer = Trainer(
 )
 
 trainer.train()
+# 50000step: 18:25:05, loss 0.0235
