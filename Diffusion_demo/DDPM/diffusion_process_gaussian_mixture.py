@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file diffusion_process.py
+# @file diffusion_process_gaussian_mixture.py
 # @author zhangshilong
 # @date 2024/8/20
 
