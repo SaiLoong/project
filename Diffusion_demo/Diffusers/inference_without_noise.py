@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
-# @file reconstruction.py
+# @file inference_without_noise.py
 # @author zhangshilong
 # @date 2024/8/25
 
 import math
 
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from matplotlib.axes import Axes
 from PIL import Image
 from torchvision import transforms
+from tqdm import tqdm
 from tqdm import trange
 
 from diffusers import DDPMScheduler
@@ -54,12 +56,59 @@ def plot_images(images, n_rows=None, n_cols=None, suptitle=None, titles=None, sc
     plt.show()
 
 
+def plot_denoise_progress(scheduler_outputs, show=6):
+    indices = np.linspace(0, len(scheduler_outputs) - 1, show, dtype=int)
+    timestamps = np.array(sorted(scheduler_outputs.keys(), reverse=True))[indices]
+
+    # current_sample_coeff、pred_original_sample_coeff、noise_coeff属性都是修改源码添加的
+    tuples = [
+        ("生成图片", "prev_sample", "current_sample_coeff"),
+        ("预测原图", "pred_original_sample", "pred_original_sample_coeff")]
+
+    for suptitle, image_key, coeff_key in tuples:
+        images = torch.stack([scheduler_outputs[t][image_key] for t in timestamps])
+        images = images.permute(1, 0, 2, 3, 4).reshape(-1, *images.shape[-3:])
+
+        titles = list()
+        for t in timestamps:
+            title = f"{t=}"
+            if (coeff := scheduler_outputs[t].get(coeff_key)) is not None:
+                title += f"\n{coeff=:.2f}"
+
+            if (noise_coeff := scheduler_outputs[t].get("noise_coeff")) is not None:
+                title += f"\n{noise_coeff=:.2f}"
+
+            titles.append(title)
+        titles += [None] * (len(images) - show)
+        plot_images(images, n_cols=show, suptitle=suptitle, titles=titles)
+
+
 # =============================================================================================
 
 
+# model_path = "/mnt/workspace/ddpm-ema-church-256"
 model_path = "/mnt/workspace/ddpm-ema-celebahq-256"
 unet = UNet2DModel.from_pretrained(model_path).cuda()
 scheduler = DDPMScheduler.from_pretrained(model_path)
+
+sample = torch.randn(
+    1, unet.config.in_channels, unet.config.sample_size, unet.config.sample_size,
+    device="cuda"
+)
+
+outputs = dict()
+for t in tqdm(scheduler.timesteps):
+    with torch.no_grad():
+        pred_noise = unet(sample, t).sample
+
+    output = scheduler.step(pred_noise, t, sample)
+    sample = output.prev_sample
+    outputs[t.item()] = output
+
+plot_denoise_progress(outputs, show=11)
+
+# =============================================================================================
+
 
 # Sheldon
 img_path = "/mnt/workspace/dataset/CelebA/data256x256/02122.jpg"
@@ -80,23 +129,18 @@ def reconstruct_from_xt(x_0, t):
     # 第0个系数对应x_1
     x_t = scheduler.add_noise(x_0, noise, torch.tensor(t - 1))
 
+    outputs = dict()
     x_rec = x_t
     for s in trange(t - 1, -1, -1):
         with torch.no_grad():
             pred_noise = unet(x_rec, s).sample
-        x_rec = scheduler.step(pred_noise, s, x_rec).prev_sample
 
-    return x_t, x_rec
+        output = scheduler.step(pred_noise, s, x_rec)
+        x_rec = output.prev_sample
+        outputs[s] = output
+
+    return x_t, x_rec, outputs
 
 
-timestamps = [100, 300, 500, 800, 1000]
-noise_images, rec_images = zip(*[reconstruct_from_xt(image, t) for t in timestamps])
-
-tuples = [
-    ("噪声图片", noise_images),
-    ("重建图片", rec_images)
-]
-for suptitle, images in tuples:
-    images = torch.concat(images)
-    titles = [f"{t=}" for t in timestamps]
-    plot_images(images, n_rows=1, suptitle=suptitle, titles=titles, scale=3)
+noise_image, rec_image, outputs = reconstruct_from_xt(image, t=5)
+plot_denoise_progress(outputs, show=6)
