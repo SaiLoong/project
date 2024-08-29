@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-# @file inference_without_noise.py
+# @file ddim.py
 # @author zhangshilong
-# @date 2024/8/25
+# @date 2024/8/29
 
 import math
 
@@ -10,11 +10,9 @@ import numpy as np
 import torch
 from matplotlib.axes import Axes
 from PIL import Image
-from torchvision import transforms
 from tqdm import tqdm
-from tqdm import trange
 
-from diffusers import DDPMScheduler
+from diffusers import DDIMScheduler
 from diffusers import UNet2DModel
 from diffusers.utils import pt_to_pil
 
@@ -86,61 +84,38 @@ def plot_denoise_progress(scheduler_outputs, show=6):
 # =============================================================================================
 
 
-# model_path = "/mnt/workspace/ddpm-ema-church-256"
 model_path = "/mnt/workspace/ddpm-ema-celebahq-256"
-unet = UNet2DModel.from_pretrained(model_path).cuda()
-scheduler = DDPMScheduler.from_pretrained(model_path)
-
-sample = torch.randn(
-    1, unet.config.in_channels, unet.config.sample_size, unet.config.sample_size,
-    device="cuda"
-)
-
-outputs = dict()
-for t in tqdm(scheduler.timesteps):
-    with torch.no_grad():
-        pred_noise = unet(sample, t).sample
-
-    output = scheduler.step(pred_noise, t, sample)
-    sample = output.prev_sample
-    outputs[t.item()] = output
-
-plot_denoise_progress(outputs, show=11)
+dtype = torch.float16
+unet = UNet2DModel.from_pretrained(model_path,
+                                   torch_dtype=dtype, device_map="cuda")
+scheduler = DDIMScheduler.from_pretrained(model_path)
 
 # =============================================================================================
 
 
-# Sheldon
-img_path = "/mnt/workspace/dataset/CelebA/data256x256/02122.jpg"
-raw_image = Image.open(img_path)
-plot_images(raw_image, suptitle="原图")
-transform = transforms.Compose([
-    transforms.PILToTensor(),
-    transforms.ConvertImageDtype(torch.float),
-    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-])
-image = transform(raw_image).unsqueeze(0).cuda()
+generator = torch.Generator("cuda").manual_seed(1024)
 
 
-# 这里的t指论文记号，即x_0表示原图，x_1、x_2、...、x_1000表示加噪图片
-def reconstruct_from_xt(x_0, t):
-    assert t > 0
-    noise = torch.randn_like(x_0)
-    # 第0个系数对应x_1
-    x_t = scheduler.add_noise(x_0, noise, torch.tensor(t - 1))
+def step(sample, eta=0.0, num_inference_steps=50):
+    scheduler.set_timesteps(num_inference_steps)
 
     outputs = dict()
-    x_rec = x_t
-    for s in trange(t - 1, -1, -1):
+    for t in tqdm(scheduler.timesteps):
         with torch.no_grad():
-            pred_noise = unet(x_rec, s).sample
+            pred_noise = unet(sample, t).sample
 
-        output = scheduler.step(pred_noise, s, x_rec)
-        x_rec = output.prev_sample
-        outputs[s] = output
+        output = scheduler.step(pred_noise, t, sample, eta=eta, generator=generator)
+        sample = output.prev_sample
+        outputs[t.item()] = output
 
-    return x_t, x_rec, outputs
+    return outputs
 
 
-noise_image, rec_image, outputs = reconstruct_from_xt(image, t=5)
-plot_denoise_progress(outputs, show=6)
+sample = torch.randn(
+    2, unet.config.in_channels, unet.config.sample_size, unet.config.sample_size,
+    device="cuda", dtype=dtype, generator=generator
+)
+
+# eta须<=1
+outputs = step(sample, eta=0, num_inference_steps=50)
+plot_denoise_progress(outputs, show=11)
