@@ -15,19 +15,20 @@ from transformers import CLIPTokenizer
 
 model_path = "/mnt/workspace/stable-diffusion-v1-5"
 device = "cuda"
+dtype = torch.float16
 
 # 1. Load the autoencoder model which will be used to decode the latents into image space.
 vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae",
-                                    torch_dtype=torch.float16, device_map="auto")
+                                    torch_dtype=dtype, device_map="auto")
 
 # 2. Load the tokenizer and text encoder to tokenize and encode the text.
 tokenizer = CLIPTokenizer.from_pretrained(model_path, subfolder="tokenizer")
 text_encoder = CLIPTextModel.from_pretrained(model_path, subfolder="text_encoder",
-                                             torch_dtype=torch.float16, device_map=device)
+                                             torch_dtype=dtype, device_map=device)
 
 # 3. The UNet model for generating the latents.
 unet = UNet2DConditionModel.from_pretrained(model_path, subfolder="unet",
-                                            torch_dtype=torch.float16, device_map="auto")
+                                            torch_dtype=dtype, device_map="auto")
 
 scheduler = PNDMScheduler.from_pretrained(model_path, subfolder="scheduler")
 # 虽然换了scheduler，但是参数和原版的完全一样
@@ -57,26 +58,15 @@ batch_size = len(prompt)
 
 # =================================================================================================
 
+# 2B
+pos_neg_prompts = [""] * batch_size + prompt
 
-# B*77
-text_input = tokenizer(prompt, padding="max_length", truncation=True, return_tensors="pt")
+# 2B*77
+text_input = tokenizer(pos_neg_prompts, padding="max_length", truncation=True, return_tensors="pt")
 
 with torch.inference_mode():
-    # B*77*768
+    # 2B*77*768
     text_embeddings = text_encoder(text_input.input_ids.to(device))[0]
-
-# =================================================================================================
-
-
-# B*77
-uncond_input = tokenizer([""] * batch_size, padding="max_length", return_tensors="pt")
-
-with torch.inference_mode():
-    # B*77*768
-    uncond_embeddings = text_encoder(uncond_input.input_ids.to(device))[0]
-
-# 2B*77*768
-text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
 
 # =================================================================================================
 
@@ -84,7 +74,7 @@ text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
 # B*4*64*64, 其中64=512/8、512是指定的宽高
 latents = torch.randn(
     (batch_size, unet.config.in_channels, height // 8, width // 8),
-    generator=generator, dtype=torch.float16, device=device
+    generator=generator, dtype=dtype, device=device
 )
 # init_noise_sigma = 1.
 latents = latents * scheduler.init_noise_sigma
