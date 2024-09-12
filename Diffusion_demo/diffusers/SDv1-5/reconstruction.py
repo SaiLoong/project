@@ -87,7 +87,7 @@ def load_image(number, hw=512):
 # ========================================================================================================
 
 
-model_path = "/mnt/workspace/stable-diffusion-v1-5"
+model_path = "/mnt/workspace/model/stable-diffusion-v1-5"
 generator = torch.Generator(device).manual_seed(1024)
 
 vae = AutoencoderKL.from_pretrained(model_path, subfolder="vae",

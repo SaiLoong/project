@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from diffusers import DiffusionPipeline
 
-model_key_base = "/mnt/workspace/stable-diffusion-v1-5"
+model_key_base = "/mnt/workspace/model/stable-diffusion-v1-5"
 
 prompt_list = [
     "Giant robots fighting in a futuristic city, with buildings falling and explosions all around, intense, fast-paced, dramatic, stylized, futuristic"

@@ -7,7 +7,7 @@ import torch
 
 from diffusers import DDIMPipeline
 
-model_path = "/mnt/workspace/ddpm-ema-celebahq-256"
+model_path = "/mnt/workspace/model/ddpm-ema-celebahq-256"
 
 pipe = DDIMPipeline.from_pretrained(model_path,
                                     torch_dtype=torch.float16).to("cuda")

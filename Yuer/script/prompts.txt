@@ -1,0 +1,49 @@
+
+
+# 正常prompt
+
+# 8490_08.jpg
+PROMPT1="young woman, Asian, straw hat, long brown hair, portrait, sleeveless top, Yuer, hand on chin, realistic, upper body, 1girl, outdoors, solo, natural light, soft focus, casual attire, serene expression, relaxed pose, simple background, summer fashion, beach style, light makeup"
+# 7557_33.jpg
+PROMPT2="young woman, long brown hair, Yuer, grey sweater, portrait, glass goblet, 1girl, realistic, beige background, upper body, soft lighting, delicate makeup, solo, gentle expression, casual pose, close-up shot, indoor setting, elegant style, high resolution, warm color tone"
+# 6747_20.jpg
+PROMPT3="young woman, portrait, Asian, casual, upper body, 1girl, school uniform, sweater vest, white shirt, book on head, relaxed, solo, Yuer, realistic, indoor, soft lighting, natural makeup, straight hair, warm colors, simple background, candid shot, cozy atmosphere, youthful, serene"
+# d01.jpg
+PROMPT4="upper body portrait of 1girl wear a black color turtleneck sweater,A proud and confident expression,long hair,look at viewers,studio fashion portrait,studio light,pure white background,"
+
+
+# ===================================================================================================
+
+
+# 色调有问题的prompt
+
+# train, 5549_22.jpg
+PROMPT1="Asian female, solo, young adult, Yuer, casual clothing (white tank top), upper body, relaxed pose, realistic, soft lighting, 1girl, indoor setting, natural makeup, soft background, portrait, cozy atmosphere, warm colors, comfortable expression, casual style, modern composition, high image quality, soft focus"
+
+# train, 5638_09.jpg
+PROMPT2="young woman, Asian, brown hair, shoulder-length, portrait, solo, 1girl, upper body, realistic, casual, Yuer, tank top, jeans, indoor setting, natural light, soft focus, relaxed pose, serene expression, makeup, simple background, modern fashion, warm colors, minimalistic style"
+
+# train, 5638_27.jpg
+PROMPT3="female, Asian, realistic, portrait, casual attire, sitting, 1girl, Yuer, upper body, relaxed pose, solo, long brown hair, neutral makeup, orange lipstick, indoor setting, soft lighting, natural colors, serene expression, simple background, minimalistic style, high image quality, soft focus"
+
+# train, 7557_33.jpg
+PROMPT4="young woman, long brown hair, Yuer, grey sweater, portrait, glass goblet, 1girl, realistic, beige background, upper body, soft lighting, delicate makeup, solo, gentle expression, casual pose, close-up shot, indoor setting, elegant style, high resolution, warm color tone"
+
+
+
+# ===================================================================================================
+
+
+# 脸部扭曲的prompt
+
+# train, 4890_03.jpg
+PROMPT1="female, young woman, Asian, long hair, shoulder-length, blue dress, realistic, 1girl, portrait, Yuer, long sleeves, casual, outdoor, solo, nature, park, fence, stone path, autumn, serene, peaceful, calm, light makeup, simple accessories, soft focus"
+
+# test, 8330_12.jpg
+PROMPT2="female, Asian, young adult, white dress, long hair, natural light, 1girl, outdoor, greenery, solo, realistic, trees, Yuer, summer, casual, hat, sunlight, serene, nature, beauty, fashion, portrait, park, daylight, relaxed, smiling"
+
+# synthesis, s06_b.jpg
+PROMPT3="portrait, 1girl, green tank top, Yuer, city life, realistic, solo, bookshelf, long brown hair, neutral colors, long-sleeved dress, floral pattern, table setting, luxury, simple setting, light green wall, long-sleeve top, holding bowl, floral bouquet, Japanese ethnicity, bending over, smiling"
+
+# default, d11.jpg
+PROMPT4="A woman dressed in a traditional East Asian outfit poses against an earth-toned background. Her elegant attire and the intricate hair accessories set against her long,flowing hair evoke a sense of historical beauty and poise.,"

@@ -81,7 +81,7 @@ img1, img2, _ = load_images("02122", "22644", "20813")
 
 # ================================================================================================
 
-model_path = "/mnt/workspace/ddpm-ema-celebahq-256"
+model_path = "/mnt/workspace/model/ddpm-ema-celebahq-256"
 unet = UNet2DModel.from_pretrained(model_path).cuda()
 scheduler = DDPMScheduler.from_pretrained(model_path)
 
