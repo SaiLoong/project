@@ -9,7 +9,7 @@ from diffusers import StableDiffusionXLImg2ImgPipeline
 from diffusers.utils import load_image
 
 # Pipeline可以直接使用DiffusionPipeline，明确写更方便进入源码
-refiner_path = "/mnt/workspace/stable-diffusion-xl-refiner-1.0"
+refiner_path = "/mnt/workspace/model/stable-diffusion-xl-refiner-1.0"
 pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
     refiner_path,
     torch_dtype=torch.float16, variant="fp16",

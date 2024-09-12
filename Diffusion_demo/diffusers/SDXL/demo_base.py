@@ -5,12 +5,18 @@
 
 import torch
 
+from diffusers import AutoencoderKL
 from diffusers import StableDiffusionXLPipeline
 
 # Pipeline可以直接使用DiffusionPipeline，明确写更方便进入源码
-base_path = "/mnt/workspace/stable-diffusion-xl-base-1.0"
+base_path = "/mnt/workspace/model/stable-diffusion-xl-base-1.0"
+vae_path = "/mnt/workspace/model/sdxl-vae-fp16-fix"
+
+# SDXL自带的VAE容易出现数值不稳定，解码时容易变成全黑图
+# 详见https://huggingface.co/madebyollin/sdxl-vae-fp16-fix
+vae = AutoencoderKL.from_pretrained(vae_path, torch_dtype=torch.float16, device_map="auto")
 pipe = StableDiffusionXLPipeline.from_pretrained(
-    base_path,
+    base_path, vae=vae,
     torch_dtype=torch.float16, variant="fp16",
     device_map="balanced"
 )

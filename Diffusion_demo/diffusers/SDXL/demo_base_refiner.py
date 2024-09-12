@@ -9,14 +9,14 @@ from diffusers import StableDiffusionXLImg2ImgPipeline
 from diffusers import StableDiffusionXLPipeline
 
 # Pipeline都可以直接使用DiffusionPipeline，明确写更方便进入源码
-base_path = "/mnt/workspace/stable-diffusion-xl-base-1.0"
+base_path = "/mnt/workspace/model/stable-diffusion-xl-base-1.0"
 base_pipe = StableDiffusionXLPipeline.from_pretrained(
     base_path,
     torch_dtype=torch.float16, variant="fp16",
     device_map="balanced"
 )
 
-refiner_path = "/mnt/workspace/stable-diffusion-xl-refiner-1.0"
+refiner_path = "/mnt/workspace/model/stable-diffusion-xl-refiner-1.0"
 refiner_pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
     refiner_path,
     torch_dtype=torch.float16, variant="fp16",

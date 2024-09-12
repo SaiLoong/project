@@ -13,7 +13,7 @@ from diffusers.utils import pt_to_pil
 from transformers import CLIPTextModel
 from transformers import CLIPTokenizer
 
-model_path = "/mnt/workspace/stable-diffusion-v1-5"
+model_path = "/mnt/workspace/model/stable-diffusion-v1-5"
 device = "cuda"
 dtype = torch.float16
 

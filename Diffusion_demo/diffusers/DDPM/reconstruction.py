@@ -57,7 +57,7 @@ def plot_images(images, n_rows=None, n_cols=None, suptitle=None, titles=None, sc
 # =============================================================================================
 
 
-model_path = "/mnt/workspace/ddpm-ema-celebahq-256"
+model_path = "/mnt/workspace/model/ddpm-ema-celebahq-256"
 unet = UNet2DModel.from_pretrained(model_path).cuda()
 scheduler = DDPMScheduler.from_pretrained(model_path)
 
