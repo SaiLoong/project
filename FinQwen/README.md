@@ -1,6 +1,22 @@
 # FinQwen
 
-[基于LLM智能问答系统挑战赛](https://tianchi.aliyun.com/competition/entrance/532172)
+### 成果
+- [基于LLM智能问答系统挑战赛](https://tianchi.aliyun.com/competition/entrance/532172)
 
-2024.7.30 [排名](https://tianchi.aliyun.com/competition/entrance/532172/rankingList)第一
+- 2024.7.30 [排名](https://tianchi.aliyun.com/competition/entrance/532172/rankingList)第一
 ![](rank.png)
+
+### 简介
+基于LLM构建一个问答系统，从公司招股书和基金数据库两种数据源中寻找答案。回答流程拆分为意图识别+NER、数据查询和文本理解三个任务
+
+#### 意图识别
+- 利用jaccard相似度匹配公司名，股票、基金等关键词辅助修正分类结果，正确率100%
+
+#### 数据查询
+- NL2SQL：few-shot ICL难以掌握正确的表名和字段名，对问题聚类后挑选50条问题编写答案作为种子数据，利用模型改写、数据增强等方式构造微调数据集，lora微调模型
+- 答案生成：从ICL库搜索最相似的4个例子，few-shot ICL的方式组织答案，如果答案存在幻觉则重新生成
+
+#### 文本理解
+- 预处理文档：官方解析好的txt文件缺失表格数据和结构信息，于是重新解析pdf文件，从页眉正则提取公司名称、将表格数据转为文本、正文按章节分块并添加章节标题
+- 文档检索：利用langchain构造BM25检索链。向量检索效果并不好，可能是embedding模型预训练语境与本次金融语境不同
+- 答案生成：2-shot ICL，模拟多轮对话的方式使模型更能遵循指令
