@@ -1,4 +1,4 @@
-# FinQwen
+# 金融问答系统
 
 ### 成果
 - [基于LLM智能问答系统挑战赛](https://tianchi.aliyun.com/competition/entrance/532172)
