@@ -23,4 +23,4 @@
 - 选择AWPortrait v1.4作为底座模型，按照官方推荐的推理配置（包括scheduler、negative prompt等）测试标记文本，检验贴合度
 - 基于diffusers进行lora微调，通过Min-SNR、调节lr、修改数据分布等方法解决人脸扭曲、训练不稳定、色彩偏差等问题
 - 对比微调模型与底座模型在训练、测试、合成、官方prompt上的差别，验证有效性
-- 更多信息详见[notion笔记](https://sailoong.notion.site/Yuer-LoRA-0ff495030d77804b8f4cecec48a44d0f)
+- 更多信息与例子详见[notion笔记](https://sailoong.notion.site/Yuer-LoRA-0ff495030d77804b8f4cecec48a44d0f)
