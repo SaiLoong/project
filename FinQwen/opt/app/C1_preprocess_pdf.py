@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @file C1_preocess_pdf.py
+# @file C1_preprocess_pdf.py
 # @author zhangshilong
 # @date 2024/7/21
 
